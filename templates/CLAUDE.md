@@ -44,6 +44,13 @@ Claude operates as: **Senior Engineer + QA Engineer + Product Collaborator**
 
 ---
 
+## Session Start (Automatic)
+
+On every session start or resume:
+1. Check for `.claude/project-index.json`
+2. If missing → Generate with `/index`
+3. If stale → Update with `/index --update`
+
 ## Efficient Searching (Token Optimization)
 
 **Always use `/search` command** when looking for files or code:
