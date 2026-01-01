@@ -15,7 +15,7 @@
 
 set -euo pipefail
 
-VERSION="0.2.1"
+VERSION="0.3.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="${SCRIPT_DIR}/../lib"
 
@@ -63,6 +63,7 @@ OPTIONS:
 PRESETS:
     full                 All rules, hooks, commands, skills, checklists (default)
     base                 Core rules only (for monorepo root, no commands/skills)
+    slim                 Single consolidated rules file (~150 tokens) - minimal footprint
     hardhat              Core + Hardhat/Solidity rules + commands/skills
     unity                Core + Unity/C# rules + commands/skills
     react                Core + React/TypeScript rules + commands/skills
@@ -178,8 +179,8 @@ cmd_init() {
 
     # Validate preset
     case "$preset" in
-        full|base|hardhat|unity|react) ;;
-        *) echo -e "${RED}Unknown preset: $preset${NC}"; echo "Available: full, base, hardhat, unity, react"; exit 1 ;;
+        full|base|slim|hardhat|unity|react) ;;
+        *) echo -e "${RED}Unknown preset: $preset${NC}"; echo "Available: full, base, slim, hardhat, unity, react"; exit 1 ;;
     esac
 
     local manifest="${target}/.claude/manifest.json"

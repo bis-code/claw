@@ -10,7 +10,7 @@ else
     TEMPLATE_DIR="${LIB_DIR}/../templates"
 fi
 
-# Core rules included in all presets
+# Core rules included in most presets (not slim)
 CORE_RULES=(
     "core-constraints.md"
     "git-workflow.md"
@@ -24,6 +24,7 @@ PRESET_RULES[base]=""
 PRESET_RULES[hardhat]="hardhat.md"
 PRESET_RULES[unity]="unity.md"
 PRESET_RULES[react]="react.md"
+PRESET_RULES[slim]="slim-rules.md"  # Single consolidated file, no core rules
 
 # Install configuration to target directory
 install_config() {
@@ -72,12 +73,14 @@ install_config() {
         done
     fi
 
-    # Core rules (always installed)
-    for rule in "${CORE_RULES[@]}"; do
-        if [[ -f "${TEMPLATE_DIR}/.claude/rules/${rule}" ]]; then
-            install_template "$target" ".claude/rules/${rule}" "Rule" "$force" "$dry_run"
-        fi
-    done
+    # Core rules (skip for slim preset which uses consolidated rules)
+    if [[ "$preset" != "slim" ]]; then
+        for rule in "${CORE_RULES[@]}"; do
+            if [[ -f "${TEMPLATE_DIR}/.claude/rules/${rule}" ]]; then
+                install_template "$target" ".claude/rules/${rule}" "Rule" "$force" "$dry_run"
+            fi
+        done
+    fi
 
     # Preset-specific rules
     local preset_rules="${PRESET_RULES[$preset]}"
@@ -89,8 +92,8 @@ install_config() {
         fi
     done
 
-    # Commands and Skills (for all presets except base, skip if --minimal)
-    if [[ "$preset" != "base" ]] && ! $minimal; then
+    # Commands and Skills (skip for base/slim presets, skip if --minimal)
+    if [[ "$preset" != "base" ]] && [[ "$preset" != "slim" ]] && ! $minimal; then
         # Commands
         for file in "${TEMPLATE_DIR}/.claude/commands/"*.md; do
             if [[ -f "$file" ]]; then
