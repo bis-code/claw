@@ -15,7 +15,7 @@
 
 set -euo pipefail
 
-VERSION="0.2.0"
+VERSION="0.2.1"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="${SCRIPT_DIR}/../lib"
 
@@ -61,11 +61,11 @@ OPTIONS:
     -h, --help           Show this help message
 
 PRESETS:
-    full                 All rules, hooks, commands, skills (default)
-    base                 Core rules only (for monorepo root)
-    hardhat              Hardhat/Solidity/Web3 rules
-    unity                Unity/C# game development rules
-    react                React/TypeScript frontend rules
+    full                 All rules, hooks, commands, skills, checklists (default)
+    base                 Core rules only (for monorepo root, no commands/skills)
+    hardhat              Core + Hardhat/Solidity rules + commands/skills
+    unity                Core + Unity/C# rules + commands/skills
+    react                Core + React/TypeScript rules + commands/skills
 
 EXAMPLES:
     # Initialize in a new project

@@ -89,8 +89,8 @@ install_config() {
         fi
     done
 
-    # Optional files (only for full preset, skip if --minimal)
-    if [[ "$preset" == "full" ]] && ! $minimal; then
+    # Commands and Skills (for all presets except base, skip if --minimal)
+    if [[ "$preset" != "base" ]] && ! $minimal; then
         # Commands
         for file in "${TEMPLATE_DIR}/.claude/commands/"*.md; do
             if [[ -f "$file" ]]; then
@@ -104,8 +104,10 @@ install_config() {
             local relpath="${file#${TEMPLATE_DIR}/}"
             install_template "$target" "$relpath" "Skill" "$force" "$dry_run"
         done
+    fi
 
-        # Checklists
+    # Checklists (only for full preset)
+    if [[ "$preset" == "full" ]] && ! $minimal; then
         for file in "${TEMPLATE_DIR}/.claude/checklists/"*.md; do
             if [[ -f "$file" ]]; then
                 local name=$(basename "$file")
