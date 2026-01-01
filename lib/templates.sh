@@ -70,8 +70,8 @@ install_config() {
             fi
         done
 
-        # Skills
-        find "${TEMPLATE_DIR}/.claude/skills" -name "*.md" -type f 2>/dev/null | while read file; do
+        # Skills (use for loop to avoid subshell from pipe)
+        for file in $(find "${TEMPLATE_DIR}/.claude/skills" -name "*.md" -type f 2>/dev/null); do
             local relpath="${file#${TEMPLATE_DIR}/}"
             install_template "$target" "$relpath" "Skill" "$force" "$dry_run"
         done
