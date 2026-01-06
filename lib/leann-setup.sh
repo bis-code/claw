@@ -51,7 +51,8 @@ get_index_name() {
 # Check if index exists
 index_exists() {
     local index_name="$1"
-    is_leann_installed && leann list 2>/dev/null | grep -q "^${index_name}$"
+    # leann list output has emoji formatting, so match index name anywhere in line
+    is_leann_installed && leann list 2>/dev/null | grep -qE "(^|[[:space:]])${index_name}([[:space:]]|$|✅)"
 }
 
 # Setup LEANN as MCP server
