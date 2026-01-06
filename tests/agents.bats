@@ -207,26 +207,5 @@ teardown() {
     assert_output --partial "docs"
 }
 
-# Integration Tests
-@test "claw agents list: CLI shows agent list" {
-    run "$PROJECT_ROOT/bin/claw" agents list
-    assert_success
-    assert_output --partial "senior-dev"
-}
-
-@test "claw agents spawn: CLI spawns agent prompt" {
-    run "$PROJECT_ROOT/bin/claw" agents spawn senior-dev
-    assert_success
-    assert_output --partial "Senior Developer"
-}
-
-@test "claw agents spawn: handles missing agent name" {
-    run "$PROJECT_ROOT/bin/claw" agents spawn
-    assert_failure
-    assert_output --partial "Usage"
-}
-
-@test "claw agents: unknown subcommand fails" {
-    run "$PROJECT_ROOT/bin/claw" agents unknown
-    assert_failure
-}
+# Note: claw agents CLI tests removed - simplified claw no longer has agents subcommand
+# The agent functions are still available via lib/agents.sh for /brainstorm command
