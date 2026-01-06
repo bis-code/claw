@@ -21,7 +21,7 @@ teardown() {
 # ============================================================================
 
 @test "checkpoint: create_checkpoint saves current state" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     mkdir -p .claude
     echo '{"tasks": []}' > .claude/queue.json
@@ -32,7 +32,7 @@ teardown() {
 }
 
 @test "checkpoint: create_checkpoint includes timestamp" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     mkdir -p .claude
     create_checkpoint "test-checkpoint"
@@ -42,7 +42,7 @@ teardown() {
 }
 
 @test "checkpoint: create_checkpoint includes queue state" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     mkdir -p .claude
     echo '{"tasks": [{"id": 1, "title": "Test"}]}' > .claude/queue.json
@@ -53,7 +53,7 @@ teardown() {
 }
 
 @test "checkpoint: create_checkpoint includes git state" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     git init -q
     echo "test" > file.txt
@@ -72,7 +72,7 @@ teardown() {
 # ============================================================================
 
 @test "checkpoint: restore_checkpoint loads saved state" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     mkdir -p .claude
     echo '{"tasks": [{"id": 1}]}' > .claude/queue.json
@@ -89,7 +89,7 @@ teardown() {
 }
 
 @test "checkpoint: restore_checkpoint fails for nonexistent checkpoint" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     mkdir -p .claude
 
@@ -99,7 +99,7 @@ teardown() {
 }
 
 @test "checkpoint: restore_checkpoint optionally resets git" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     git init -q
     echo "original" > file.txt
@@ -125,7 +125,7 @@ teardown() {
 # ============================================================================
 
 @test "checkpoint: list_checkpoints shows all checkpoints" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     mkdir -p .claude
     create_checkpoint "checkpoint-1"
@@ -138,7 +138,7 @@ teardown() {
 }
 
 @test "checkpoint: list_checkpoints shows empty for no checkpoints" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     mkdir -p .claude
 
@@ -152,7 +152,7 @@ teardown() {
 # ============================================================================
 
 @test "checkpoint: auto_checkpoint creates checkpoint before risky operations" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     mkdir -p .claude
 
@@ -162,7 +162,7 @@ teardown() {
 }
 
 @test "checkpoint: checkpoint rotation keeps last N checkpoints" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     mkdir -p .claude
 
@@ -180,7 +180,7 @@ teardown() {
 # ============================================================================
 
 @test "checkpoint: save_session persists context across restarts" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     mkdir -p .claude
 
@@ -195,7 +195,7 @@ teardown() {
 }
 
 @test "checkpoint: clear_session removes session data" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     mkdir -p .claude
 

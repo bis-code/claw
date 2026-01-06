@@ -49,6 +49,9 @@ jobs:
       - name: Run multi-repo tests
         run: ./tests/bats/bin/bats tests/multi_repo.bats
 
+      - name: Run autonomous execution tests
+        run: ./tests/bats/bin/bats tests/autonomous/*.bats
+
       - name: Run external dependency tests
         run: |
           export PATH="$HOME/.local/bin:$PATH"

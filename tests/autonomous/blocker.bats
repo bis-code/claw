@@ -21,7 +21,6 @@ teardown() {
 # ============================================================================
 
 @test "blocker: detect_blocker identifies missing dependency" {
-    skip "Not implemented yet"
     cd "$TMP_DIR"
 
     run detect_blocker "Module not found: 'some-package'"
@@ -31,7 +30,6 @@ teardown() {
 }
 
 @test "blocker: detect_blocker identifies permission denied" {
-    skip "Not implemented yet"
     cd "$TMP_DIR"
 
     run detect_blocker "Permission denied: /etc/passwd"
@@ -40,7 +38,6 @@ teardown() {
 }
 
 @test "blocker: detect_blocker identifies network error" {
-    skip "Not implemented yet"
     cd "$TMP_DIR"
 
     run detect_blocker "ECONNREFUSED: Connection refused"
@@ -49,7 +46,6 @@ teardown() {
 }
 
 @test "blocker: detect_blocker identifies rate limit" {
-    skip "Not implemented yet"
     cd "$TMP_DIR"
 
     run detect_blocker "API rate limit exceeded"
@@ -58,7 +54,6 @@ teardown() {
 }
 
 @test "blocker: detect_blocker identifies authentication failure" {
-    skip "Not implemented yet"
     cd "$TMP_DIR"
 
     run detect_blocker "401 Unauthorized"
@@ -67,7 +62,6 @@ teardown() {
 }
 
 @test "blocker: detect_blocker returns unknown for unrecognized errors" {
-    skip "Not implemented yet"
     cd "$TMP_DIR"
 
     run detect_blocker "Some random error message"
@@ -80,7 +74,6 @@ teardown() {
 # ============================================================================
 
 @test "blocker: classify_blocker distinguishes recoverable vs fatal" {
-    skip "Not implemented yet"
     cd "$TMP_DIR"
 
     run classify_blocker "missing_dependency"
@@ -93,7 +86,6 @@ teardown() {
 }
 
 @test "blocker: is_recoverable returns true for recoverable blockers" {
-    skip "Not implemented yet"
     cd "$TMP_DIR"
 
     run is_recoverable "missing_dependency"
@@ -108,7 +100,6 @@ teardown() {
 # ============================================================================
 
 @test "blocker: suggest_resolution provides fix for missing dependency" {
-    skip "Not implemented yet"
     cd "$TMP_DIR"
     echo '{}' > package.json
 
@@ -118,7 +109,6 @@ teardown() {
 }
 
 @test "blocker: suggest_resolution provides fix for rate limit" {
-    skip "Not implemented yet"
     cd "$TMP_DIR"
 
     run suggest_resolution "rate_limit"
@@ -127,7 +117,6 @@ teardown() {
 }
 
 @test "blocker: auto_resolve attempts to fix recoverable blockers" {
-    skip "Not implemented yet"
     cd "$TMP_DIR"
     echo '{}' > package.json
 
@@ -141,7 +130,6 @@ teardown() {
 }
 
 @test "blocker: auto_resolve fails for fatal blockers" {
-    skip "Not implemented yet"
     cd "$TMP_DIR"
 
     run auto_resolve "permission" "/etc/passwd"
@@ -154,7 +142,6 @@ teardown() {
 # ============================================================================
 
 @test "blocker: request_human_help creates intervention request" {
-    skip "Not implemented yet"
     cd "$TMP_DIR"
     mkdir -p .claude
 
@@ -164,7 +151,6 @@ teardown() {
 }
 
 @test "blocker: intervention request contains context" {
-    skip "Not implemented yet"
     cd "$TMP_DIR"
     mkdir -p .claude
 
@@ -176,7 +162,6 @@ teardown() {
 }
 
 @test "blocker: check_intervention_resolved detects human response" {
-    skip "Not implemented yet"
     cd "$TMP_DIR"
     mkdir -p .claude
 
@@ -189,7 +174,6 @@ teardown() {
 }
 
 @test "blocker: wait_for_intervention blocks until resolved" {
-    skip "Not implemented yet"
     cd "$TMP_DIR"
     mkdir -p .claude
 
@@ -206,7 +190,6 @@ teardown() {
 # ============================================================================
 
 @test "blocker: log_blocker records blocker occurrence" {
-    skip "Not implemented yet"
     cd "$TMP_DIR"
     mkdir -p .claude
 
@@ -216,7 +199,6 @@ teardown() {
 }
 
 @test "blocker: get_blocker_history returns past blockers" {
-    skip "Not implemented yet"
     cd "$TMP_DIR"
     mkdir -p .claude
 
@@ -230,7 +212,6 @@ teardown() {
 }
 
 @test "blocker: analyze_blockers identifies patterns" {
-    skip "Not implemented yet"
     cd "$TMP_DIR"
     mkdir -p .claude
 
@@ -250,7 +231,6 @@ teardown() {
 # ============================================================================
 
 @test "blocker: get_confidence_score returns score based on history" {
-    skip "Not implemented yet"
     cd "$TMP_DIR"
     mkdir -p .claude
 
@@ -270,7 +250,6 @@ teardown() {
 }
 
 @test "blocker: should_proceed returns false below threshold" {
-    skip "Not implemented yet"
     cd "$TMP_DIR"
     mkdir -p .claude
 

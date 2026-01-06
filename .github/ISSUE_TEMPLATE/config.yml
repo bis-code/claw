@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/bis-code/claw#readme
+    about: Check the README for usage and examples
+  - name: Discussions
+    url: https://github.com/bis-code/claw/discussions
+    about: Ask questions and share ideas

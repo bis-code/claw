@@ -21,7 +21,7 @@ teardown() {
 # ============================================================================
 
 @test "feedback: detect_test_framework identifies npm test" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     echo '{"scripts": {"test": "jest"}}' > package.json
 
@@ -31,7 +31,7 @@ teardown() {
 }
 
 @test "feedback: detect_test_framework identifies pytest" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     echo "[tool.pytest]" > pyproject.toml
 
@@ -41,7 +41,7 @@ teardown() {
 }
 
 @test "feedback: detect_test_framework identifies cargo test" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     echo "[package]" > Cargo.toml
 
@@ -51,7 +51,7 @@ teardown() {
 }
 
 @test "feedback: detect_test_framework identifies go test" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     echo "module test" > go.mod
 
@@ -61,7 +61,7 @@ teardown() {
 }
 
 @test "feedback: detect_test_framework returns unknown for no framework" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
 
     run detect_test_framework
@@ -74,7 +74,7 @@ teardown() {
 # ============================================================================
 
 @test "feedback: run_tests executes detected framework" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     echo '{"scripts": {"test": "echo TESTS_PASSED"}}' > package.json
 
@@ -84,7 +84,7 @@ teardown() {
 }
 
 @test "feedback: run_tests returns failure on test failure" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     echo '{"scripts": {"test": "exit 1"}}' > package.json
 
@@ -93,7 +93,7 @@ teardown() {
 }
 
 @test "feedback: run_tests captures output" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     echo '{"scripts": {"test": "echo line1 && echo line2"}}' > package.json
 
@@ -107,7 +107,7 @@ teardown() {
 # ============================================================================
 
 @test "feedback: parse_test_errors extracts jest errors" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     cat > test-output.log << 'EOF'
 FAIL src/utils.test.js
@@ -126,7 +126,7 @@ EOF
 }
 
 @test "feedback: parse_test_errors extracts pytest errors" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     cat > test-output.log << 'EOF'
 FAILED tests/test_utils.py::test_add - AssertionError: assert 4 == 5
@@ -142,7 +142,7 @@ EOF
 }
 
 @test "feedback: parse_test_errors returns structured JSON" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     cat > test-output.log << 'EOF'
 FAIL src/test.js
@@ -161,7 +161,7 @@ EOF
 # ============================================================================
 
 @test "feedback: suggest_fix provides guidance for common errors" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
 
     run suggest_fix "TypeError: Cannot read property 'x' of undefined"
@@ -170,7 +170,7 @@ EOF
 }
 
 @test "feedback: suggest_fix handles assertion failures" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
 
     run suggest_fix "Expected 5 but received 4"
@@ -183,7 +183,7 @@ EOF
 # ============================================================================
 
 @test "feedback: feedback_loop runs tests and retries on failure" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     mkdir -p src
 
@@ -207,7 +207,7 @@ EOF
 }
 
 @test "feedback: feedback_loop gives up after max retries" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
 
     cat > always_fail.sh << 'EOF'
@@ -223,7 +223,7 @@ EOF
 }
 
 @test "feedback: feedback_loop tracks retry count" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
 
     cat > always_fail.sh << 'EOF'
@@ -244,7 +244,7 @@ EOF
 # ============================================================================
 
 @test "feedback: detect_build_command identifies npm build" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     echo '{"scripts": {"build": "tsc"}}' > package.json
 
@@ -254,7 +254,7 @@ EOF
 }
 
 @test "feedback: run_build executes build and captures errors" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     echo '{"scripts": {"build": "echo BUILD_SUCCESS"}}' > package.json
 
@@ -264,7 +264,7 @@ EOF
 }
 
 @test "feedback: parse_build_errors extracts TypeScript errors" {
-    skip "Not implemented yet"
+    # Enabled
     cd "$TMP_DIR"
     cat > build-output.log << 'EOF'
 src/index.ts(10,5): error TS2322: Type 'string' is not assignable to type 'number'.
