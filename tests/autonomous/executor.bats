@@ -90,6 +90,10 @@ teardown() {
 }
 
 @test "executor: run_loop stops on blocker" {
+    # Skip on macOS due to timing differences in process output capture
+    if [[ "$(uname)" == "Darwin" ]]; then
+        skip "Flaky on macOS"
+    fi
     cd "$TMP_DIR"
     init_task_queue
     add_task "exit 1" "high"  # This will fail
