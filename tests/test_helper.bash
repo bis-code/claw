@@ -9,6 +9,24 @@ export PROJECT_ROOT
 source "$PROJECT_ROOT/lib/detect-project.sh"
 source "$PROJECT_ROOT/lib/agents.sh"
 source "$PROJECT_ROOT/lib/leann-setup.sh"
+source "$PROJECT_ROOT/lib/manifest.sh"
+
+# Colors (needed by files.sh)
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+# Version (needed by templates.sh)
+VERSION="0.4.3"
+LIB_DIR="$PROJECT_ROOT/lib"
+
+source "$PROJECT_ROOT/lib/files.sh"
+source "$PROJECT_ROOT/lib/templates.sh"
 
 # Create a temporary directory for tests
 create_test_dir() {

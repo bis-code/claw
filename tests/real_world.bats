@@ -28,21 +28,32 @@ teardown() {
 
     # Should create .claude directory
     assert [ -d ".claude" ]
-    assert [ -d ".claude/commands" ]
-
-    # Should create CLAUDE.md
-    assert [ -f "CLAUDE.md" ]
+    assert [ -d ".claude/rules" ]
 }
 
-@test "new project: claw init creates valid CLAUDE.md" {
+@test "new project: claw init creates valid CLAUDE.md for full preset" {
+    mkdir -p "$TMP_DIR/new-project"
+    cd "$TMP_DIR/new-project"
+
+    "$PROJECT_ROOT/bin/claw" init --preset full
+
+    run cat CLAUDE.md
+    assert_success
+    assert_output --partial "CLAUDE.md"
+    assert_output --partial "Critical Rules"
+}
+
+@test "new project: claw init creates manifest.json" {
     mkdir -p "$TMP_DIR/new-project"
     cd "$TMP_DIR/new-project"
 
     "$PROJECT_ROOT/bin/claw" init
 
-    run cat CLAUDE.md
-    assert_success
-    assert_output --partial "Project Instructions"
+    # Should create manifest for version tracking
+    assert [ -f ".claude/manifest.json" ]
+    run cat .claude/manifest.json
+    assert_output --partial "version"
+    assert_output --partial "claw"
 }
 
 @test "new project: claw init on React project auto-detects type" {
@@ -110,13 +121,17 @@ EOF
 # Existing Config Tests - Projects that already have Claude configuration
 # ============================================================================
 
-@test "existing config: claw init warns about existing .claude" {
+@test "existing config: claw init shows installed version" {
     mkdir -p "$TMP_DIR/existing-project/.claude"
     cd "$TMP_DIR/existing-project"
 
-    run "$PROJECT_ROOT/bin/claw" init
+    # First init creates manifest
+    "$PROJECT_ROOT/bin/claw" init --preset base
+
+    # Second init shows installed version
+    run "$PROJECT_ROOT/bin/claw" init --preset base
     assert_success
-    assert_output --partial "already exists"
+    assert_output --partial "Installed:"
 }
 
 @test "existing config: claw init --force overwrites" {
@@ -320,12 +335,12 @@ EOF
 {"name": "existing-app", "dependencies": {"express": "^4.0.0"}}
 EOF
 
-    # Init should warn but work
+    # Init should work and create manifest
     run "$PROJECT_ROOT/bin/claw" init
     assert_success
-    assert_output --partial "already exists"
+    assert_output --partial "Setup Complete"
 
-    # Custom command should still exist (not overwritten without --force)
+    # Custom command should still exist (not managed by claw)
     assert [ -f ".claude/commands/custom.md" ]
 
     # Detect should work

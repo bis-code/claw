@@ -320,7 +320,7 @@ detect_multi_repo() {
         final_siblings=("${related_siblings[@]}")
     elif [[ ${#git_siblings[@]} -gt 0 ]]; then
         final_siblings=("${git_siblings[@]}")
-    else
+    elif [[ ${#pattern_siblings[@]} -gt 0 ]]; then
         final_siblings=("${pattern_siblings[@]}")
     fi
 

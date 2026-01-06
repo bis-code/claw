@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# templates.sh - Configuration templates and installation logic
+# templates.sh - Configuration templates and installation logic for claw
+# Handles preset-based installation with smart file management
 #
 
 # Template directory - check homebrew layout first, then fallback to dev layout
@@ -265,5 +266,5 @@ export_config() {
     echo -e "${GREEN}Export complete!${NC}"
     echo -e "Templates saved to: ${CYAN}${output_dir}${NC}"
     echo ""
-    echo "To update the installed version, bump the VERSION in bin/claude-setup"
+    echo "To update the installed version, bump the VERSION in bin/claw"
 }

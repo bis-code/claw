@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# manifest.sh - Manifest management functions
+# manifest.sh - Manifest management functions for claw
+# Tracks installed version and file checksums for smart upgrades
 #
 
 # Get installed version from manifest
@@ -86,7 +87,7 @@ write_manifest() {
   "version": "$version",
   "preset": "$preset",
   "generated": "$(date -u '+%Y-%m-%dT%H:%M:%SZ')",
-  "generator": "claude-setup",
+  "generator": "claw",
   "files": [
 EOF
 

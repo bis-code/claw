@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# files.sh - File operation functions
+# files.sh - File operation functions for claw
+# Tracks created/updated/skipped/conflict files during installation
 #
 
 # Arrays to track operations
@@ -134,7 +135,7 @@ print_summary() {
         echo -e "Next steps:"
         echo -e "  1. ${YELLOW}Edit CLAUDE.md${NC} to customize for your project"
         echo -e "  2. ${YELLOW}Review .claude/rules/${NC} and modify as needed"
-        echo -e "  3. ${YELLOW}Run 'claude-setup check'${NC} to see future updates"
+        echo -e "  3. ${YELLOW}Run 'claw check'${NC} to see future updates"
         echo ""
     fi
 }

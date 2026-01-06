@@ -1,7 +1,7 @@
 # claw - Claude Automated Workflow
 
 ![Version](https://img.shields.io/badge/version-0.4.3-blue)
-![Tests](https://img.shields.io/badge/tests-202%20passing-green)
+![Tests](https://img.shields.io/badge/tests-222%20passing-green)
 ![License](https://img.shields.io/badge/license-MIT-brightgreen)
 
 > **Supercharge Claude Code with project detection, agent brainstorming, and semantic search**
@@ -104,8 +104,11 @@ Fetches issues tagged `claude-ready` and helps prioritize.
 |---------|-------------|
 | `claw init` | Initialize Claude config (auto-detects project type) |
 | `claw init --preset unity` | Initialize with specific preset |
+| `claw init --force` | Force overwrite all files |
+| `claw check` | Preview what would be updated (dry-run) |
+| `claw upgrade` | Smart upgrade - preserves your modifications |
+| `claw upgrade --force` | Overwrite everything, including modified files |
 | `claw detect` | Show detected project type and recommended agents |
-| `claw upgrade` | Upgrade existing config to latest |
 | `claw agents list` | List all available agents |
 | `claw agents spawn <name>` | Show full prompt for an agent |
 | `claw leann status` | Show LEANN installation status |
@@ -115,6 +118,22 @@ Fetches issues tagged `claude-ready` and helps prioritize.
 | `claw multi-repo issues` | Fetch issues from all repos |
 | `claw version` | Show version |
 | `claw help` | Show help |
+
+### Smart Upgrades
+
+claw tracks which files you've modified using `.claude/manifest.json`:
+
+- **Upgrade** (`claw upgrade`) - Updates claw files but skips your modifications
+- **Check** (`claw check`) - Preview what would be updated without changing anything
+- **Force** (`claw upgrade --force`) - Overwrite everything, including your modifications
+
+Example:
+```bash
+claw init                # Install claw config
+# ... modify .claude/rules/security.md ...
+claw upgrade             # Updates other files, skips security.md
+claw check               # Shows: [MODIFIED] security.md (use --force)
+```
 
 ## Project Types
 
@@ -205,8 +224,8 @@ your-project/
 
 ```bash
 make setup      # Install all dependencies
-make test       # Run core tests (165 tests)
-make test-all   # Run all tests including external deps
+make test       # Run core tests (116 tests)
+make test-all   # Run all tests including external deps (222 tests)
 ```
 
 ## Contributing
