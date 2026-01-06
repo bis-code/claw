@@ -2,286 +2,238 @@
 #
 # claw - Claude Automated Workflow
 #
-# A CLI tool to setup and manage Claude Code configurations
-# with intelligent project detection and agent-based brainstorming.
+# External orchestrator for Claude Code
+# Wraps Claude Code with claw's prompts, rules, and autonomous capabilities
+# while preserving ALL Claude Code features (bypass permission, shift+tab, MCP, etc.)
 #
 
 set -euo pipefail
 
-VERSION="0.4.3"
+# x-release-please-start-version
+VERSION="0.6.0"
+# x-release-please-end
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="${SCRIPT_DIR}/../lib"
-TEMPLATES_DIR="${SCRIPT_DIR}/../templates"
-
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-MAGENTA='\033[0;35m'
-BOLD='\033[1m'
-NC='\033[0m'
 
 # Source libraries
-source "$LIB_DIR/detect-project.sh"
-source "$LIB_DIR/agents.sh"
-source "$LIB_DIR/leann-setup.sh"
-source "$LIB_DIR/manifest.sh"
-source "$LIB_DIR/files.sh"
-source "$LIB_DIR/templates.sh"
+source "$LIB_DIR/home.sh"
+source "$LIB_DIR/output.sh" 2>/dev/null || true
+source "$LIB_DIR/wrapper.sh"
+source "$LIB_DIR/orchestrator.sh"
+
+# Legacy libraries (for backwards compatibility)
+[[ -f "$LIB_DIR/detect-project.sh" ]] && source "$LIB_DIR/detect-project.sh"
+[[ -f "$LIB_DIR/agents.sh" ]] && source "$LIB_DIR/agents.sh"
+[[ -f "$LIB_DIR/leann-setup.sh" ]] && source "$LIB_DIR/leann-setup.sh"
 
 # ============================================================================
 # Help
 # ============================================================================
 
 show_help() {
-    echo -e "${BOLD}claw${NC} - Claude Automated Workflow"
-    echo ""
-    echo "Usage: claw <command> [options]"
-    echo ""
-    echo "Commands:"
-    echo "  init [--preset <name>]  Initialize Claude config in current directory"
-    echo "  check                    Preview what would be updated (dry-run)"
-    echo "  upgrade                  Upgrade existing configuration (smart merge)"
-    echo "  detect                   Detect project type and show recommendations"
-    echo "  agents <subcommand>      Manage agent roster"
-    echo "  leann <subcommand>       LEANN semantic search integration"
-    echo "  multi-repo <subcommand>  Multi-repo project support"
-    echo "  version                  Show version information"
-    echo "  help                     Show this help message"
-    echo ""
-    echo "Options:"
-    echo "  --preset, -p <name>      Use specific preset (full, base, slim, etc.)"
-    echo "  --force, -f              Force overwrite modified files"
-    echo "  --minimal, -m            Skip optional files (commands, skills)"
-    echo ""
-    echo "Presets:"
-    echo "  full     - All features enabled"
-    echo "  base     - Standard configuration"
-    echo "  slim     - Minimal configuration"
-    echo "  hardhat  - Web3/Hardhat specific"
-    echo "  unity    - Unity game development"
-    echo "  react    - React/Next.js web app"
-    echo ""
-    echo "Examples:"
-    echo "  claw init                 # Auto-detect and initialize"
-    echo "  claw init --preset unity  # Initialize with Unity preset"
-    echo "  claw check                # See what would be updated"
-    echo "  claw upgrade              # Upgrade, preserving modified files"
-    echo "  claw upgrade --force      # Upgrade, overwriting all files"
+    cat << 'EOF'
+claw - Claude Automated Workflow
+
+External orchestrator for Claude Code. Wraps Claude Code with claw's prompts,
+rules, and autonomous capabilities while preserving ALL Claude Code features.
+
+USAGE:
+    claw <command> [options]
+
+MAIN COMMANDS:
+    start [OPTIONS]         Start Claude Code with claw context (transparent wrapper)
+    auto [OPTIONS]          Run autonomous development loop
+    run "prompt"            Run Claude once with a prompt and exit
+    skill <name>            Execute a claw skill
+
+SETUP COMMANDS:
+    init                    Initialize ~/.claw (first-time setup)
+    config                  Show current claw configuration
+    prompts                 List available prompts
+    rules                   List available rules
+    skills                  List available skills
+
+LEGACY COMMANDS:
+    detect                  Detect project type
+    agents <cmd>            Manage agent roster
+    leann <cmd>             LEANN semantic search
+
+OPTIONS FOR 'start':
+    --mode, -m <mode>       Use specific mode (base, tdd, autonomous)
+    --rules, -r <rules>     Include specific rules (space-separated)
+    --dir, -d <path>        Working directory (default: current)
+    -- <args>               Pass remaining args to Claude Code
+
+OPTIONS FOR 'auto':
+    --hours, -h <N>         Time budget in hours (default: 4)
+    --max-iterations, -n    Max loop iterations (default: 50)
+    --task, -t "task"       Specific task to work on
+
+EXAMPLES:
+    claw init                           # First-time setup
+    claw start                          # Start Claude with claw context
+    claw start --mode tdd               # Start in TDD mode
+    claw start --rules security         # Include security rules
+    claw auto --hours 2                 # Autonomous mode for 2 hours
+    claw run "fix the auth bug"         # One-shot command
+    claw skill plan-day --hours 4       # Run a skill
+
+HOW IT WORKS:
+    Claw injects context into CLAUDE.md before starting Claude Code,
+    then runs Claude Code directly. You get ALL Claude features:
+    - Bypass permission toggle
+    - Shift+Tab cycling
+    - MCP servers
+    - All keyboard shortcuts
+    - Full terminal UI
+
+CONFIGURATION:
+    ~/.claw/
+    ├── config.json         # Global settings
+    ├── prompts/            # System prompts (base.md, tdd.md, etc.)
+    ├── rules/              # Rule files (security.md, testing.md, etc.)
+    ├── skills/             # Skill files (plan-day.md, etc.)
+    └── logs/               # Session logs
+
+VERSION:
+    claw v${VERSION}
+    https://github.com/bis-code/claw
+EOF
 }
 
 # ============================================================================
 # Commands
 # ============================================================================
 
+cmd_init() {
+    local force=false
+    [[ "${1:-}" == "--force" ]] && force=true
+
+    echo "Setting up claw..."
+    echo ""
+
+    if $force; then
+        setup_claw_home --force
+    else
+        setup_claw_home
+    fi
+
+    echo ""
+    echo "Setup complete! Run 'claw start' to begin."
+}
+
+cmd_start() {
+    run_claude "$@"
+}
+
+cmd_auto() {
+    run_auto_loop "$@"
+}
+
+cmd_run() {
+    run_claude_once "$@"
+}
+
+cmd_skill() {
+    local skill_name="${1:-}"
+    shift || true
+
+    if [[ -z "$skill_name" ]]; then
+        echo "Usage: claw skill <name> [args...]"
+        echo ""
+        list_skills
+        return 1
+    fi
+
+    run_skill "$skill_name" "$@"
+}
+
+cmd_config() {
+    show_claw_config
+}
+
+cmd_prompts() {
+    list_prompts
+}
+
+cmd_rules() {
+    list_rules
+}
+
+cmd_skills() {
+    list_skills
+}
+
 cmd_version() {
-    echo -e "${BOLD}claw${NC} v${VERSION}"
+    echo "claw v${VERSION}"
     echo "Claude Automated Workflow"
     echo ""
+    echo "Home: ${CLAW_HOME:-~/.claw}"
     echo "https://github.com/bis-code/claw"
 }
 
+# Legacy commands for backwards compatibility
 cmd_detect() {
-    local target="${1:-.}"
-
-    echo -e "${BOLD}Project Detection${NC}"
-    echo ""
-
-    print_detection_summary "$target"
-
-    local multi_json
-    multi_json=$(detect_multi_repo "$target")
-    if echo "$multi_json" | grep -q '"detected": true'; then
+    if type -t detect_project_type &>/dev/null; then
+        local target="${1:-.}"
+        echo "Project Detection"
         echo ""
-        echo -e "${CYAN}Multi-Repo:${NC} Yes"
-        echo "$multi_json" | grep '"name"' | sed 's/.*"name": "\([^"]*\)".*/  - \1/'
-    fi
-}
-
-cmd_init() {
-    local preset=""
-    local target="."
-    local force=false
-    local minimal=false
-    local dry_run=false
-
-    # Parse arguments
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            --preset|-p)
-                preset="$2"
-                shift 2
-                ;;
-            --force|-f)
-                force=true
-                shift
-                ;;
-            --minimal|-m)
-                minimal=true
-                shift
-                ;;
-            --dry-run|--check)
-                dry_run=true
-                shift
-                ;;
-            *)
-                target="$1"
-                shift
-                ;;
-        esac
-    done
-
-    # Validate preset if specified
-    if [[ -n "$preset" ]]; then
-        case "$preset" in
-            full|base|slim|hardhat|unity|react) ;;
-            *)
-                echo -e "${RED}Unknown preset: $preset${NC}"
-                echo "Available presets: full, base, slim, hardhat, unity, react"
-                exit 1
-                ;;
-        esac
-    fi
-
-    # Auto-detect preset if not specified
-    if [[ -z "$preset" ]]; then
-        local type
-        type=$(detect_project_type "$target")
-        case "$type" in
-            game-unity) preset="unity" ;;
-            web3) preset="hardhat" ;;
-            saas|web) preset="react" ;;
-            *) preset="base" ;;
-        esac
-        echo -e "${CYAN}Auto-detected preset:${NC} $preset (type: $type)"
-    fi
-
-    echo -e "${BOLD}claw${NC} v${VERSION} - Initializing..."
-    echo ""
-
-    # Use smart installation
-    install_config "$target" "$force" "$minimal" "$dry_run" "$preset"
-}
-
-cmd_upgrade() {
-    # Parse force flag
-    local force=false
-    local args=()
-    for arg in "$@"; do
-        if [[ "$arg" == "--force" ]] || [[ "$arg" == "-f" ]]; then
-            force=true
-        else
-            args+=("$arg")
-        fi
-    done
-
-    # Get installed preset
-    local target="${args[0]:-.}"
-    local installed_preset
-    installed_preset=$(get_installed_preset "$target")
-
-    echo -e "${BOLD}claw${NC} v${VERSION} - Upgrading..."
-    echo ""
-
-    # Call init with the installed preset (unless force, then use their settings)
-    if $force; then
-        cmd_init --force "${args[@]}"
+        print_detection_summary "$target" 2>/dev/null || detect_project_type "$target"
     else
-        cmd_init --preset "$installed_preset" "${args[@]}"
+        echo "Detection not available in new architecture"
+        echo "Use: claw start --mode <mode>"
     fi
-}
-
-cmd_check() {
-    echo -e "${BOLD}claw${NC} v${VERSION} - Checking for updates..."
-    echo ""
-    cmd_init --dry-run "$@"
 }
 
 cmd_agents() {
-    local subcmd="${1:-list}"
-    shift || true
+    if type -t get_agents_for_type &>/dev/null; then
+        local subcmd="${1:-list}"
+        shift || true
 
-    case "$subcmd" in
-        list)
-            local type
-            type=$(detect_project_type ".")
-            echo -e "${BOLD}Available Agents${NC}"
-            echo -e "${CYAN}Project type:${NC} $type"
-            echo ""
-
-            local recommended
-            recommended=$(get_agents_for_type "$type")
-
-            echo -e "${GREEN}Recommended for this project:${NC}"
-            for agent in $recommended; do
-                echo -n "  - $agent"
-                case "$agent" in
-                    senior-dev) echo "  (Code architecture)" ;;
-                    product) echo "  (User value, prioritization)" ;;
-                    cto) echo "  (Technical strategy)" ;;
-                    qa) echo "  (Testing, quality)" ;;
-                    ux) echo "  (User experience)" ;;
-                    security) echo "  (Security, compliance)" ;;
-                    gameplay-programmer) echo "  (Game mechanics, player feel)" ;;
-                    systems-programmer) echo "  (Core systems, performance)" ;;
-                    tools-programmer) echo "  (Editor tools, automation, pipeline)" ;;
-                    technical-artist) echo "  (Shaders, materials, VFX, optimization)" ;;
-                    *) echo "  (no description)" ;;
-                esac
-            done
-            echo ""
-            echo "To see full agent prompt: claw agents spawn <name>"
-            ;;
-        spawn)
-            local agent_name="${1:-}"
-            if [[ -z "$agent_name" ]]; then
-                echo -e "${RED}Usage: claw agents spawn <agent-name>${NC}"
-                exit 1
-            fi
-            echo -e "${BOLD}Agent Prompt for:${NC} ${CYAN}$agent_name${NC}"
-            echo ""
-            echo "---"
-            get_agent_prompt "$agent_name"
-            echo "---"
-            ;;
-        *)
-            echo -e "${RED}Unknown agents command: $subcmd${NC}"
-            echo "Available: list, spawn"
-            exit 1
-            ;;
-    esac
+        case "$subcmd" in
+            list)
+                local type
+                type=$(detect_project_type "." 2>/dev/null || echo "unknown")
+                echo "Available Agents (project type: $type)"
+                echo ""
+                local recommended
+                recommended=$(get_agents_for_type "$type" 2>/dev/null || echo "senior-dev qa")
+                for agent in $recommended; do
+                    echo "  - $agent"
+                done
+                ;;
+            spawn)
+                local agent_name="${1:-}"
+                if [[ -z "$agent_name" ]]; then
+                    echo "Usage: claw agents spawn <name>"
+                    return 1
+                fi
+                get_agent_prompt "$agent_name"
+                ;;
+            *)
+                echo "Unknown agents command: $subcmd"
+                ;;
+        esac
+    else
+        echo "Agents not available"
+    fi
 }
 
-cmd_multi_repo() {
-    local subcmd="${1:-detect}"
-    shift || true
+cmd_leann() {
+    if type -t leann_cmd &>/dev/null; then
+        leann_cmd "$@"
+    else
+        echo "LEANN integration not available"
+    fi
+}
 
-    case "$subcmd" in
-        detect)
-            echo -e "${BOLD}Multi-Repo Detection${NC}"
-            echo ""
-            local result
-            result=$(detect_multi_repo ".")
-            echo "$result" | while IFS= read -r line; do
-                echo "$line"
-            done
-            ;;
-        config)
-            create_multi_repo_config "."
-            ;;
-        issues)
-            echo -e "${BOLD}Fetching issues from all repositories...${NC}"
-            echo ""
-            fetch_multi_repo_issues "." "claude-ready"
-            ;;
-        *)
-            echo -e "${RED}Unknown multi-repo command: $subcmd${NC}"
-            echo "Available: detect, config, issues"
-            exit 1
-            ;;
-    esac
+cmd_status() {
+    show_auto_status
+}
+
+cmd_stop() {
+    stop_auto_loop
 }
 
 # ============================================================================
@@ -293,35 +245,75 @@ main() {
     shift || true
 
     case "$cmd" in
+        # Help
         help|--help|-h)
             show_help
             ;;
-        version|--version|-v)
-            cmd_version
+
+        # Main commands
+        start)
+            cmd_start "$@"
             ;;
+        auto)
+            cmd_auto "$@"
+            ;;
+        run)
+            cmd_run "$@"
+            ;;
+        skill)
+            cmd_skill "$@"
+            ;;
+
+        # Setup commands
         init)
             cmd_init "$@"
             ;;
+        config)
+            cmd_config
+            ;;
+        prompts)
+            cmd_prompts
+            ;;
+        rules)
+            cmd_rules
+            ;;
+        skills)
+            cmd_skills
+            ;;
+
+        # Status commands
+        status)
+            cmd_status
+            ;;
+        stop)
+            cmd_stop
+            ;;
+
+        # Version
+        version|--version|-v)
+            cmd_version
+            ;;
+
+        # Legacy commands
         detect)
             cmd_detect "$@"
-            ;;
-        upgrade)
-            cmd_upgrade "$@"
-            ;;
-        check)
-            cmd_check "$@"
             ;;
         agents)
             cmd_agents "$@"
             ;;
         leann)
-            leann_cmd "$@"
+            cmd_leann "$@"
             ;;
         multi-repo)
-            cmd_multi_repo "$@"
+            echo "multi-repo deprecated. Use: claw start"
             ;;
+        check|upgrade)
+            echo "check/upgrade deprecated. Claw now uses ~/.claw for configuration."
+            echo "Run: claw init"
+            ;;
+
         *)
-            echo -e "${RED}Unknown command: $cmd${NC}"
+            echo "Unknown command: $cmd"
             echo "Run 'claw help' for usage information"
             exit 1
             ;;
