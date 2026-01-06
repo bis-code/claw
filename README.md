@@ -1,4 +1,4 @@
-# claw - Claude with better defaults
+# claw - Command Line Automated Workflow
 
 Just type `claw` instead of `claude`. That's it.
 

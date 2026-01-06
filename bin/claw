@@ -191,7 +191,7 @@ main() {
             ;;
         --help|-h)
             cat << 'EOF'
-claw - Claude with better defaults
+claw - Command Line Automated Workflow
 
 Usage: claw [arguments]
 
