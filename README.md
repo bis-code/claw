@@ -64,7 +64,7 @@ Use `/brainstorm Should we use Redis or PostgreSQL?` - agents debate from their 
 
 ```bash
 claw leann status              # Check if LEANN installed
-pip install leann              # Install if needed
+pip install leann              # Install if needed (restart Claude Code after)
 claw leann build               # Build search index
 ```
 
