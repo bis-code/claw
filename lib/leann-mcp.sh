@@ -183,10 +183,10 @@ show_setup_step() {
 # Show final status box
 show_setup_complete() {
     echo ""
-    printf "${GREEN}╭────────────────────────────────────────╮${NC}\n"
-    printf "${GREEN}│${NC} ${BOLD}Leann MCP configured successfully!${NC}    ${GREEN}│${NC}\n"
-    printf "${GREEN}│${NC} ${GRAY}Semantic code search is now enabled.${NC}  ${GREEN}│${NC}\n"
-    printf "${GREEN}╰────────────────────────────────────────╯${NC}\n"
+    printf "${GREEN}╭───────────────────────────────────────╮${NC}\n"
+    printf "${GREEN}│${NC} ${BOLD}Leann MCP configured successfully!${NC}  ${GREEN}│${NC}\n"
+    printf "${GREEN}│${NC} ${GRAY}Semantic code search is now enabled.${NC}${GREEN}│${NC}\n"
+    printf "${GREEN}╰───────────────────────────────────────╯${NC}\n"
     echo ""
 }
 
