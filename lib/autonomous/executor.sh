@@ -7,11 +7,33 @@
 set -euo pipefail
 
 QUEUE_FILE=".claude/queue.json"
+LOG_FILE=".claude/autonomous.log"
+
+# ============================================================================
+# Logging
+# ============================================================================
+
+# Log a message to the autonomous log file
+# Usage: log_autonomous "message" [level]
+log_autonomous() {
+    local message="$1"
+    local level="${2:-INFO}"
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+
+    mkdir -p .claude
+    echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
+}
+
+# ============================================================================
+# Task Queue Management
+# ============================================================================
 
 # Initialize an empty task queue
 init_task_queue() {
     mkdir -p .claude
     echo '{"tasks": [], "completed": [], "failed": []}' > "$QUEUE_FILE"
+    log_autonomous "Task queue initialized"
 }
 
 # Add a task to the queue
@@ -199,6 +221,7 @@ run_loop() {
         fi
 
         # Execute the task
+        log_autonomous "Starting task: $task_desc" "INFO"
         local exit_code=0
         set +e
         execute_task "$task_desc"
@@ -206,6 +229,7 @@ run_loop() {
         set -e
 
         if [[ $exit_code -ne 0 ]]; then
+            log_autonomous "Task failed: $task_desc (exit code: $exit_code)" "ERROR"
             if $stop_on_failure; then
                 echo "BLOCKED: Task failed with exit code $exit_code"
                 return 1
@@ -213,6 +237,7 @@ run_loop() {
             # Mark as failed and continue
             fail_task "$task_id"
         else
+            log_autonomous "Task completed: $task_desc" "INFO"
             complete_task "$task_id"
         fi
 

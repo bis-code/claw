@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 #
 # install.sh - Installation script for claw
-#
+# x-release-please-start-version
+VERSION="0.5.0"
+# x-release-please-end
 
 set -euo pipefail
 
