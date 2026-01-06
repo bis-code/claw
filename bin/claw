@@ -30,11 +30,12 @@ source "${SCRIPT_DIR}/../lib/repos.sh"
 if [[ -t 1 ]]; then
     CYAN='\033[0;36m'
     GREEN='\033[0;32m'
+    RED='\033[0;31m'
     GRAY='\033[0;90m'
     BOLD='\033[1m'
     NC='\033[0m'
 else
-    CYAN='' GREEN='' GRAY='' BOLD='' NC=''
+    CYAN='' GREEN='' RED='' GRAY='' BOLD='' NC=''
 fi
 
 # ============================================================================
@@ -113,6 +114,62 @@ show_exit_message() {
     fi
 
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+}
+
+# ============================================================================
+# Startup Banner
+# ============================================================================
+
+show_startup_banner() {
+    # Gather info
+    local claude_version="not installed"
+    local claude_status="${RED}✗ not found${NC}"
+    if command -v claude &>/dev/null; then
+        claude_version=$(claude --version 2>/dev/null | head -1 | sed 's/claude //' || echo "unknown")
+        claude_status="${GREEN}✓ ready${NC}"
+    fi
+
+    local current_repo
+    current_repo=$(get_current_repo 2>/dev/null || echo "")
+
+    local tracked_count=0
+    if [[ -f "$CLAW_HOME/repos.json" ]]; then
+        tracked_count=$(jq '.repos | length' "$CLAW_HOME/repos.json" 2>/dev/null || echo 0)
+    fi
+
+    # Teal/Cyan color scheme
+    local TEAL='\033[0;96m'
+    local DIM='\033[2m'
+
+    echo ""
+    echo -e "${TEAL}╭─${NC} ${BOLD}claw${NC} ${DIM}v${VERSION}${NC} ${TEAL}───────────────────────────────────────────────────────────────╮${NC}"
+    echo -e "${TEAL}│${NC}                                                                            ${TEAL}│${NC}"
+    echo -e "${TEAL}│${NC}      ${TEAL}/\\___/\\${NC}                ${TEAL}${BOLD}Commands${NC}                                     ${TEAL}│${NC}"
+    echo -e "${TEAL}│${NC}     ${TEAL}(  • •  )${NC}               ${DIM}/plan-day${NC}    Plan from GitHub issues          ${TEAL}│${NC}"
+    echo -e "${TEAL}│${NC}     ${TEAL}(   ∧   )${NC}               ${DIM}/brainstorm${NC}  Multi-perspective analysis       ${TEAL}│${NC}"
+    echo -e "${TEAL}│${NC}      ${TEAL}/${NC}|${TEAL}╲${NC}_${TEAL}╱${NC}|${TEAL}\\${NC}               ${DIM}/ship-day${NC}    Create PR when done             ${TEAL}│${NC}"
+    echo -e "${TEAL}│${NC}     ${TEAL}(_/ \\_)${NC}                                                             ${TEAL}│${NC}"
+    echo -e "${TEAL}│${NC}                                                                            ${TEAL}│${NC}"
+    echo -e "${TEAL}│${NC}  ${BOLD}Command Line${NC}                ${TEAL}${BOLD}Status${NC}                                       ${TEAL}│${NC}"
+    echo -e "${TEAL}│${NC}  ${BOLD}Automated Workflow${NC}          Claude: ${claude_status} ${DIM}(${claude_version})${NC}                  ${TEAL}│${NC}"
+
+    # Show current repo
+    if [[ -n "$current_repo" ]]; then
+        printf "${TEAL}│${NC}                              Current: ${GREEN}%s${NC}%*s${TEAL}│${NC}\n" "$current_repo" $((28 - ${#current_repo})) ""
+    else
+        echo -e "${TEAL}│${NC}                              ${DIM}Not in a git repo${NC}                        ${TEAL}│${NC}"
+    fi
+
+    # Show tracked repos
+    if [[ $tracked_count -gt 0 ]]; then
+        printf "${TEAL}│${NC}                              Tracked: ${TEAL}%d repo(s)${NC}%*s${TEAL}│${NC}\n" "$tracked_count" $((19 - ${#tracked_count})) ""
+    else
+        echo -e "${TEAL}│${NC}                              ${DIM}No repos tracked${NC}                         ${TEAL}│${NC}"
+    fi
+
+    echo -e "${TEAL}│${NC}                                                                            ${TEAL}│${NC}"
+    echo -e "${TEAL}╰────────────────────────────────────────────────────────────────────────────╯${NC}"
+    echo ""
 }
 
 # ============================================================================
@@ -248,6 +305,11 @@ EOF
         echo "Error: claude not found. Install Claude Code first."
         echo "https://claude.ai/code"
         exit 1
+    fi
+
+    # Show startup banner (only for interactive sessions without args)
+    if [[ $# -eq 0 ]] || [[ "${1:-}" == "--continue" ]] || [[ "${1:-}" == "-c" ]]; then
+        show_startup_banner
     fi
 
     # Get session ID before running (to compare after)
