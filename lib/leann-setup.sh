@@ -39,6 +39,21 @@ install_leann() {
     return 1
 }
 
+# Get default index name for current directory
+get_index_name() {
+    local dir="${1:-.}"
+    local abs_dir
+    abs_dir=$(cd "$dir" && pwd)
+    # Use directory name as index name, sanitized
+    basename "$abs_dir" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]-' '-' | sed 's/-*$//'
+}
+
+# Check if index exists
+index_exists() {
+    local index_name="$1"
+    is_leann_installed && leann list 2>/dev/null | grep -q "^${index_name}$"
+}
+
 # Setup LEANN as MCP server
 setup_leann_mcp() {
     local project_name="${1:-default}"
@@ -58,7 +73,7 @@ setup_leann_mcp() {
 
 # Build LEANN index for current project
 build_index() {
-    local index_name="${1:-project-index}"
+    local index_name="${1:-$(get_index_name)}"
     local docs_path="${2:-.}"
 
     if ! is_leann_installed; then
@@ -80,14 +95,32 @@ build_index() {
     leann build "$index_name" --docs "$docs_path"
 }
 
-# Search LEANN index
+# Search LEANN index (auto-creates if missing)
 search_index() {
-    local index_name="${1:-project-index}"
-    local query="$2"
+    local query="${1:-}"
+    local index_name="${2:-$(get_index_name)}"
 
-    if ! is_leann_installed; then
-        echo "Error: LEANN is not installed"
+    if [[ -z "$query" ]]; then
+        echo "Usage: claw leann search <query> [index-name]"
         return 1
+    fi
+
+    # Check if LEANN installed
+    if ! is_leann_installed; then
+        echo "LEANN not installed. Using fallback grep search..."
+        fallback_search "$query"
+        return 0
+    fi
+
+    # Auto-create index if missing
+    if ! index_exists "$index_name"; then
+        echo "Index '$index_name' not found. Building..."
+        leann build "$index_name" --docs . || {
+            echo "Index build failed. Using fallback grep search..."
+            fallback_search "$query"
+            return 0
+        }
+        echo ""
     fi
 
     leann search "$index_name" "$query"
