@@ -12,19 +12,7 @@ A CLI tool that supercharges Claude Code with intelligent project detection, AI 
 - Auto-generated slash commands (`/brainstorm`, `/plan-day`, `/search`)
 - 165 passing tests
 
-## Features
-
-| Feature | Description |
-|---------|-------------|
-| **Project Detection** | Automatically identifies Unity, Godot, SaaS, Web3, ML, API, mobile, desktop, and more |
-| **Agent Brainstorming** | 17 specialized agents (Senior Dev, Product, CTO, QA, Security, etc.) for multi-perspective analysis |
-| **LEANN Search** | Semantic code search powered by local embeddings |
-| **Multi-Repo** | Coordinate work across related repositories |
-| **Presets** | Quick setup with full, base, slim, hardhat, unity, react presets |
-
-## Quick Start
-
-### Installation
+## Installation
 
 **Homebrew (recommended):**
 ```bash
@@ -39,45 +27,154 @@ cd claude-code-setup
 ./install.sh --prefix ~/.local
 ```
 
-### Per-Project Setup
+---
+
+## Usage Levels
+
+claw is designed to grow with your needs. Start simple, add capabilities as you need them.
+
+### Level 1: Basic Setup (30 seconds)
+
+Just want Claude Code configured? One command:
 
 ```bash
 cd your-project
-claw init              # Auto-detects project type
-claw init --preset unity   # Or specify a preset
+claw init
 ```
 
-### Ongoing Usage
+**What you get:**
+- `.claude/` directory with slash commands
+- `CLAUDE.md` project instructions file
+- Auto-detected project type and preset
+
+**Use in Claude Code:**
+```
+/brainstorm    # Get multi-perspective feedback on ideas
+```
+
+---
+
+### Level 2: Agent Brainstorming (2 minutes)
+
+Want AI personas to debate your decisions? Check what agents are recommended:
 
 ```bash
-# In Claude Code, use the slash commands:
-/brainstorm    # Start multi-agent brainstorming session
-/plan-day      # Plan your day based on GitHub issues
-/search query  # Semantic search across codebase
+claw detect                    # See your project type
+claw agents list               # See recommended agents
+claw agents spawn senior-dev   # Preview an agent's prompt
 ```
 
-## Commands
+**Example output:**
+```
+Project Type: saas
+Recommended Agents: senior-dev product cto qa ux security
+```
+
+**Use in Claude Code:**
+```
+/brainstorm Should we use Redis or PostgreSQL for sessions?
+```
+
+The agents will debate from their perspectives (Security will worry about expiry, DevOps about ops overhead, etc.)
+
+---
+
+### Level 3: Semantic Search (5 minutes)
+
+Want to search your codebase by meaning, not just keywords?
 
 ```bash
-claw init [--preset <name>]   # Initialize Claude config
-claw detect                   # Detect project type
-claw upgrade                  # Upgrade existing config
-claw agents list              # List available agents
-claw agents spawn <name>      # Show agent prompt
-claw leann status             # Show LEANN status
-claw leann build              # Build search index
-claw multi-repo detect        # Detect sibling repos
-claw version                  # Show version
-claw help                     # Show help
+# Check if LEANN is installed
+claw leann status
+
+# If not installed:
+pip install leann   # or: uvx leann
+
+# Build the search index
+claw leann build
 ```
 
-## Project Detection
+**Use in Claude Code:**
+```
+/search "where is user authentication handled"
+/search "database connection pooling"
+```
 
-claw automatically detects your project type and recommends appropriate agents:
+---
+
+### Level 4: Multi-Repo Projects (5 minutes)
+
+Working across multiple related repositories?
+
+```bash
+# From any repo in the group
+claw multi-repo detect
+```
+
+**How detection works (in priority order):**
+
+1. **Prefix matching** - If you're in `myapp-frontend`, finds `myapp-backend`, `myapp-api`
+2. **Git siblings** - Finds any sibling folders with `.git` directories
+3. **Pattern matching** - Finds folders named `frontend`, `backend`, `api`, `contracts`, etc.
+
+**Example output:**
+```json
+{
+  "detected": true,
+  "prefix": "myapp",
+  "siblings": [
+    {"name": "myapp-backend", "type": "api"},
+    {"name": "myapp-contracts", "type": "web3"}
+  ]
+}
+```
+
+**Coordinate across repos:**
+```bash
+claw multi-repo config     # Create shared config
+claw multi-repo issues     # Fetch issues from all repos
+```
+
+---
+
+### Level 5: Daily Planning (GitHub integration)
+
+Plan your day based on GitHub issues labeled for Claude:
+
+```bash
+# Requires: gh auth login
+/plan-day
+```
+
+This fetches issues tagged `claude-ready` from your repo(s) and helps prioritize.
+
+---
+
+## Command Reference
+
+| Command | Description |
+|---------|-------------|
+| `claw init` | Initialize Claude config (auto-detects project type) |
+| `claw init --preset unity` | Initialize with specific preset |
+| `claw detect` | Show detected project type and recommended agents |
+| `claw upgrade` | Upgrade existing config to latest |
+| `claw agents list` | List all available agents |
+| `claw agents spawn <name>` | Show full prompt for an agent |
+| `claw leann status` | Show LEANN installation status |
+| `claw leann build` | Build semantic search index |
+| `claw multi-repo detect` | Detect related repositories |
+| `claw multi-repo config` | Create multi-repo configuration |
+| `claw multi-repo issues` | Fetch issues from all repos |
+| `claw version` | Show version |
+| `claw help` | Show help |
+
+## Project Types
+
+claw detects 17+ project types and recommends appropriate agents:
 
 | Type | Detection | Recommended Agents |
 |------|-----------|-------------------|
-| `game-unity` | `ProjectSettings/`, `.unity` files | gameplay-programmer, systems-programmer, technical-artist |
+| `game-unity` | `ProjectSettings/`, `.unity` | gameplay-programmer, systems-programmer, technical-artist |
 | `game-godot` | `project.godot` | gameplay-programmer, systems-programmer, tools-programmer |
 | `saas` | Next.js + Stripe/Auth | senior-dev, product, ux, security |
 | `web3` | Hardhat/Foundry | senior-dev, security, auditor |
@@ -87,63 +184,51 @@ claw automatically detects your project type and recommends appropriate agents:
 | `desktop` | Electron/Tauri | desktop-specialist, ux, senior-dev |
 | `cli` | Has `bin` or `cmd/` | senior-dev, docs, qa |
 | `library` | Publishable package | senior-dev, docs, api-designer |
+| `web` | React/Vue/Svelte | senior-dev, ux, product, qa |
 
 ## Agent Roster
 
-17 specialized agents provide different perspectives during brainstorming:
+17 specialized agents provide different perspectives:
 
 **General:**
-- `senior-dev` - Code architecture, patterns, technical debt
-- `product` - User value, prioritization, MVP scope
-- `cto` - Technical strategy, scalability, team considerations
-- `qa` - Testing strategies, edge cases, quality gates
-- `ux` - User experience, accessibility, interaction design
-- `security` - Vulnerabilities, compliance, secure coding
-- `docs` - Documentation, API design, developer experience
-- `api-designer` - REST/GraphQL design, versioning, contracts
+| Agent | Focus |
+|-------|-------|
+| `senior-dev` | Code architecture, patterns, technical debt |
+| `product` | User value, prioritization, MVP scope |
+| `cto` | Technical strategy, scalability, team considerations |
+| `qa` | Testing strategies, edge cases, quality gates |
+| `ux` | User experience, accessibility, interaction design |
+| `security` | Vulnerabilities, compliance, secure coding |
+| `docs` | Documentation, API design, developer experience |
+| `api-designer` | REST/GraphQL design, versioning, contracts |
 
 **Game Development:**
-- `gameplay-programmer` - Game mechanics, player feel, systems
-- `systems-programmer` - Core systems, performance, memory
-- `tools-programmer` - Editor tools, automation, pipeline
-- `technical-artist` - Shaders, VFX, rendering optimization
+| Agent | Focus |
+|-------|-------|
+| `gameplay-programmer` | Game mechanics, player feel, systems |
+| `systems-programmer` | Core systems, performance, memory |
+| `tools-programmer` | Editor tools, automation, pipeline |
+| `technical-artist` | Shaders, VFX, rendering optimization |
 
 **Specialized:**
-- `data-scientist` - ML models, data pipelines, experiments
-- `mlops` - Model deployment, monitoring, infrastructure
-- `mobile-specialist` - Mobile-specific patterns, performance
-- `desktop-specialist` - Desktop app patterns, native integration
-- `auditor` - Smart contract security, formal verification
+| Agent | Focus |
+|-------|-------|
+| `data-scientist` | ML models, data pipelines, experiments |
+| `mlops` | Model deployment, monitoring, infrastructure |
+| `mobile-specialist` | Mobile-specific patterns, performance |
+| `desktop-specialist` | Desktop app patterns, native integration |
+| `auditor` | Smart contract security, formal verification |
 
-## LEANN Integration
+## Presets
 
-LEANN provides semantic code search using local embeddings:
-
-```bash
-# Check status
-claw leann status
-
-# Build index for current project
-claw leann build
-
-# Search (via Claude Code slash command)
-/search "authentication flow"
-```
-
-## Multi-Repo Support
-
-For projects split across multiple repositories:
-
-```bash
-# Detect sibling repos (e.g., frontend, backend, contracts)
-claw multi-repo detect
-
-# Create shared config
-claw multi-repo config
-
-# Fetch issues from all repos
-claw multi-repo issues
-```
+| Preset | Best For |
+|--------|----------|
+| `full` | All features enabled |
+| `base` | Standard configuration |
+| `slim` | Minimal setup |
+| `hardhat` | Web3/Solidity development |
+| `unity` | Unity game development |
+| `react` | React/Next.js web apps |
 
 ## What Gets Installed
 
@@ -158,35 +243,22 @@ your-project/
 └── CLAUDE.md                # Project instructions
 ```
 
-## Presets
-
-| Preset | Best For |
-|--------|----------|
-| `full` | All features enabled |
-| `base` | Standard configuration |
-| `slim` | Minimal setup |
-| `hardhat` | Web3/Solidity development |
-| `unity` | Unity game development |
-| `react` | React/Next.js web apps |
-
 ## Requirements
 
 - Bash 4.0+
 - Claude Code CLI
 - Git
-- Optional: LEANN (`uvx leann`), GitHub CLI (`gh`)
+
+**Optional (for enhanced features):**
+- LEANN (`pip install leann` or `uvx leann`) - Semantic search
+- GitHub CLI (`gh`) - Issue fetching, multi-repo coordination
 
 ## Development
 
 ```bash
-# Run tests
-make test
-
-# Run all tests including external deps
-make test-all
-
-# Setup dev environment
-make setup
+make setup      # Install all dependencies
+make test       # Run core tests (165 tests)
+make test-all   # Run all tests including external deps
 ```
 
 ## Contributing
@@ -194,7 +266,7 @@ make setup
 1. Fork the repository
 2. Create a feature branch
 3. Make changes and add tests
-4. Submit PR with appropriate label (`feature`, `fix`, `docs`, `chore`)
+4. Submit PR with label: `feature`, `fix`, `docs`, or `chore`
 
 ## License
 
