@@ -41,10 +41,13 @@ jobs:
       - name: Run integration tests
         run: ./tests/bats/bin/bats tests/integration.bats tests/edge_cases.bats
 
+      - name: Run CLI tests
+        run: ./tests/bats/bin/bats tests/claw_cli.bats tests/repos.bats tests/home.bats tests/manifest.bats
+
       - name: Run LEANN tests
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-          ./tests/bats/bin/bats tests/leann.bats
+          ./tests/bats/bin/bats tests/leann.bats tests/leann_mcp.bats
 
       - name: Run multi-repo tests
         run: ./tests/bats/bin/bats tests/multi_repo.bats
@@ -55,7 +58,7 @@ jobs:
       - name: Run external dependency tests
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-          ./tests/bats/bin/bats tests/external_deps.bats
+          ./tests/bats/bin/bats tests/external_deps.bats tests/real_world.bats
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
