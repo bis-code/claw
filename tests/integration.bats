@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Integration tests for claw CLI
+# Integration tests for claw CLI (simplified architecture)
 
 load 'test_helper/bats-support/load'
 load 'test_helper/bats-assert/load'
@@ -8,142 +8,112 @@ load 'test_helper.bash'
 setup() {
     TMP_DIR=$(mktemp -d -t claw-test-XXXXXX)
     export TMP_DIR
+    export CLAW_HOME="$TMP_DIR/claw-home"
+    export CLAUDE_HOME="$TMP_DIR/claude-home"
+    mkdir -p "$CLAW_HOME" "$CLAUDE_HOME"
 }
 
 teardown() {
     rm -rf "$TMP_DIR"
 }
 
+# ============================================================================
+# Installation
+# ============================================================================
+
 @test "install.sh: installs to custom prefix" {
     run "$PROJECT_ROOT/install.sh" --prefix "$TMP_DIR"
     assert_success
 }
 
-@test "claw: shows help without errors" {
-    run "$PROJECT_ROOT/bin/claw" help
+# ============================================================================
+# Basic CLI
+# ============================================================================
+
+@test "claw: shows help with --help" {
+    run "$PROJECT_ROOT/bin/claw" --help
     assert_success
-    assert_output --partial "claw"
+    assert_output --partial "Command Line Automated Workflow"
 }
 
-@test "claw version: shows version info" {
-    run "$PROJECT_ROOT/bin/claw" version
+@test "claw: shows version with --version" {
+    run "$PROJECT_ROOT/bin/claw" --version
     assert_success
-    assert_output --partial "claw"
+    assert_output --partial "claw v"
 }
 
-@test "claw detect: detects SaaS project correctly" {
-    mkdir -p "$TMP_DIR"
-    cat > "$TMP_DIR/package.json" << 'EOF'
-{"name": "my-saas", "dependencies": {"next": "^14.0.0", "stripe": "^13.0.0"}}
-EOF
-    cd "$TMP_DIR"
-    run "$PROJECT_ROOT/bin/claw" detect
+# ============================================================================
+# Repos Integration
+# ============================================================================
+
+@test "e2e: repos workflow - add, list, remove" {
+    # Add repos
+    run "$PROJECT_ROOT/bin/claw" repos add org/repo1
     assert_success
-    assert_output --partial "saas"
+    assert_output --partial "Added"
+
+    run "$PROJECT_ROOT/bin/claw" repos add org/repo2
+    assert_success
+
+    # List shows both
+    run "$PROJECT_ROOT/bin/claw" repos list
+    assert_success
+    assert_output --partial "org/repo1"
+    assert_output --partial "org/repo2"
+    assert_output --partial "2"
+
+    # Remove one
+    run "$PROJECT_ROOT/bin/claw" repos remove org/repo1
+    assert_success
+    assert_output --partial "Removed"
+
+    # List shows only remaining
+    run "$PROJECT_ROOT/bin/claw" repos list
+    assert_success
+    assert_output --partial "org/repo2"
+    refute_output --partial "org/repo1"
 }
 
-@test "claw detect: detects Unity game project" {
-    mkdir -p "$TMP_DIR/Assets" "$TMP_DIR/ProjectSettings"
-    cd "$TMP_DIR"
-    run "$PROJECT_ROOT/bin/claw" detect
-    assert_success
-    assert_output --partial "game-unity"
+@test "e2e: repos validation - rejects invalid format" {
+    run "$PROJECT_ROOT/bin/claw" repos add "invalid-no-slash"
+    assert_failure
+
+    run "$PROJECT_ROOT/bin/claw" repos add "/no-owner"
+    assert_failure
+
+    run "$PROJECT_ROOT/bin/claw" repos add "no-repo/"
+    assert_failure
 }
 
-@test "claw detect: detects monorepo with multiple packages" {
-    mkdir -p "$TMP_DIR/packages/web" "$TMP_DIR/packages/api"
-    cat > "$TMP_DIR/package.json" << 'EOF'
-{"name": "monorepo", "workspaces": ["packages/*"]}
-EOF
-    cat > "$TMP_DIR/packages/web/package.json" << 'EOF'
-{"name": "web", "dependencies": {"react": "^18.0.0"}}
-EOF
-    cat > "$TMP_DIR/packages/api/package.json" << 'EOF'
-{"name": "api", "dependencies": {"express": "^4.18.0"}}
-EOF
-    cd "$TMP_DIR"
-    run "$PROJECT_ROOT/bin/claw" detect
+@test "e2e: repos idempotent - no duplicates" {
+    "$PROJECT_ROOT/bin/claw" repos add org/repo
+    "$PROJECT_ROOT/bin/claw" repos add org/repo
+    "$PROJECT_ROOT/bin/claw" repos add org/repo
+
+    run "$PROJECT_ROOT/bin/claw" repos list
     assert_success
-    assert_output --partial "Packages:"
+    # Count should be 1, not 3
+    assert_output --partial "1"
 }
 
-@test "claw multi-repo detect: finds sibling repos" {
-    local parent="$TMP_DIR/projects"
-    mkdir -p "$parent/game" "$parent/frontend"
-    touch "$parent/game/.git" "$parent/frontend/.git"
-    cd "$parent/game"
-    run "$PROJECT_ROOT/bin/claw" multi-repo detect
-    assert_success
-}
+# ============================================================================
+# Issues Integration
+# ============================================================================
 
-@test "claw init: creates .claude directory structure" {
-    mkdir -p "$TMP_DIR"
-    cat > "$TMP_DIR/package.json" << 'EOF'
-{"name": "test-project"}
-EOF
-    cd "$TMP_DIR"
-    run "$PROJECT_ROOT/bin/claw" init --preset base
-    assert_success
-    assert [ -d "$TMP_DIR/.claude" ]
-}
-
-@test "claw init: auto-detects preset based on project type" {
-    mkdir -p "$TMP_DIR/Assets" "$TMP_DIR/ProjectSettings"
-    cd "$TMP_DIR"
-    run "$PROJECT_ROOT/bin/claw" init
-    assert_success
-}
-
-@test "claw agents list: shows agents for current project type" {
-    mkdir -p "$TMP_DIR/Assets" "$TMP_DIR/ProjectSettings"
-    cd "$TMP_DIR"
-    run "$PROJECT_ROOT/bin/claw" agents list
-    assert_success
-    assert_output --partial "gameplay-programmer"
-}
-
-@test "claw agents spawn: shows agent prompt" {
-    run "$PROJECT_ROOT/bin/claw" agents spawn senior-dev
-    assert_success
-    assert_output --partial "Senior Developer"
-}
-
-@test "claw leann status: shows installation status" {
-    run "$PROJECT_ROOT/bin/claw" leann status
-    assert_success
-    assert_output --partial "LEANN Status"
-}
-
-@test "e2e: full workflow - init, detect, agents" {
-    mkdir -p "$TMP_DIR"
-    cat > "$TMP_DIR/package.json" << 'EOF'
-{"name": "test", "dependencies": {"next": "^14.0.0", "stripe": "^13.0.0"}}
-EOF
-    cd "$TMP_DIR"
-
-    run "$PROJECT_ROOT/bin/claw" init
-    assert_success
-
-    run "$PROJECT_ROOT/bin/claw" detect
-    assert_success
-    assert_output --partial "saas"
-
-    run "$PROJECT_ROOT/bin/claw" agents list
+@test "e2e: issues command runs without error" {
+    # Even without repos, should not error
+    run "$PROJECT_ROOT/bin/claw" issues
     assert_success
 }
 
-@test "e2e: game project workflow" {
-    mkdir -p "$TMP_DIR/Assets" "$TMP_DIR/ProjectSettings"
-    cd "$TMP_DIR"
+# ============================================================================
+# Update Command
+# ============================================================================
 
-    run "$PROJECT_ROOT/bin/claw" init
-    assert_success
+@test "e2e: --update reinstalls commands" {
+    touch "$CLAW_HOME/.commands-installed"
 
-    run "$PROJECT_ROOT/bin/claw" detect
+    run "$PROJECT_ROOT/bin/claw" --update
     assert_success
-    assert_output --partial "game-unity"
-
-    run "$PROJECT_ROOT/bin/claw" agents list
-    assert_success
-    assert_output --partial "gameplay-programmer"
+    assert_output --partial "Commands updated"
 }
