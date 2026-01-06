@@ -229,86 +229,9 @@ EOF
     assert_output --partial "uv"
 }
 
-#==============================================================================
-# Integration: claw leann commands
-#==============================================================================
-
-@test "claw leann status: shows LEANN status" {
-    run "$PROJECT_ROOT/bin/claw" leann status
-    assert_success
-    assert_output --partial "LEANN Status"
-}
-
-@test "claw leann: status includes installation check" {
-    run "$PROJECT_ROOT/bin/claw" leann status
-    assert_success
-
-    if command -v leann &>/dev/null; then
-        assert_output --partial "Installed:"
-    fi
-}
-
-#==============================================================================
-# Integration: claw multi-repo with real gh
-#==============================================================================
-
-@test "claw multi-repo: detect finds sibling repos" {
-    skip_if_no_gh_auth
-
-    # This test uses the actual project structure
-    cd "$PROJECT_ROOT"
-
-    run "$PROJECT_ROOT/bin/claw" multi-repo detect
-    assert_success
-}
-
-@test "claw multi-repo: issues fetches from GitHub" {
-    skip_if_no_gh_auth
-
-    # Run from the actual project directory (which is a real GitHub repo)
-    cd "$PROJECT_ROOT"
-
-    run "$PROJECT_ROOT/bin/claw" multi-repo issues
-    # Should succeed - either returns issues or empty (no issues with claude-ready label)
-    assert_success
-}
-
-#==============================================================================
-# End-to-End: Full workflow test
-#==============================================================================
-
-@test "E2E: init project with LEANN indexing" {
-    skip_if_no_leann
-
-    # Create a test project
-    mkdir -p "$TMP_DIR/e2e-project/src"
-    cat > "$TMP_DIR/e2e-project/package.json" << 'EOF'
-{
-    "name": "e2e-test",
-    "version": "1.0.0",
-    "dependencies": {
-        "express": "^4.18.0"
-    }
-}
-EOF
-    echo "// Express server code" > "$TMP_DIR/e2e-project/src/index.js"
-
-    cd "$TMP_DIR/e2e-project"
-
-    # Initialize with claw
-    run "$PROJECT_ROOT/bin/claw" init
-    assert_success
-
-    # Verify .claude directory was created
-    assert [ -d ".claude" ]
-
-    # Check LEANN status
-    run "$PROJECT_ROOT/bin/claw" leann status
-    assert_success
-}
-
-@test "E2E: agent spawn generates valid prompt" {
-    run "$PROJECT_ROOT/bin/claw" agents spawn senior-dev
-    assert_success
-    assert_output --partial "Senior Developer"
-}
+# Note: CLI integration tests for removed commands (claw leann, claw multi-repo,
+# claw init, claw agents) have been removed as those commands no longer exist.
+# The current claw CLI is a wrapper around claude with:
+# - repos add/remove/list/clear for multi-repo tracking
+# - issues for fetching issues
+# - --setup-leann for MCP configuration
