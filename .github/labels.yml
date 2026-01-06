@@ -1,0 +1,26 @@
+# Labels for categorizing PRs in release notes
+# Sync with: gh label import .github/labels.yml
+
+- name: feature
+  color: "0e8a16"
+  description: "New feature or enhancement"
+
+- name: fix
+  color: "d73a4a"
+  description: "Bug fix"
+
+- name: docs
+  color: "0075ca"
+  description: "Documentation changes"
+
+- name: chore
+  color: "fef2c0"
+  description: "Maintenance, refactoring, or tooling"
+
+- name: breaking
+  color: "b60205"
+  description: "Breaking change (major version bump)"
+
+- name: dependencies
+  color: "0366d6"
+  description: "Dependency updates"
