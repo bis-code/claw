@@ -1,7 +1,7 @@
 # claw - Claude Automated Workflow
 
 ![Version](https://img.shields.io/badge/version-0.4.3-blue)
-![Tests](https://img.shields.io/badge/tests-165%20passing-green)
+![Tests](https://img.shields.io/badge/tests-171%20passing-green)
 ![License](https://img.shields.io/badge/license-MIT-brightgreen)
 
 > **Supercharge Claude Code with project detection, agent brainstorming, and semantic search**
