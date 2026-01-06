@@ -182,11 +182,28 @@ show_setup_step() {
 
 # Show final status box
 show_setup_complete() {
+    local w=40  # inner width
+    local line1="Leann MCP configured successfully!"
+    local line2="Semantic code search is now enabled."
+
     echo ""
-    printf "${GREEN}╭───────────────────────────────────────╮${NC}\n"
-    printf "${GREEN}│${NC} ${BOLD}Leann MCP configured successfully!${NC}  ${GREEN}│${NC}\n"
-    printf "${GREEN}│${NC} ${GRAY}Semantic code search is now enabled.${NC}${GREEN}│${NC}\n"
-    printf "${GREEN}╰───────────────────────────────────────╯${NC}\n"
+    # Top border
+    printf "${GREEN}╭"
+    printf '─%.0s' $(seq 1 $w)
+    printf "╮${NC}\n"
+
+    # Line 1 (bold)
+    local pad1=$((w - ${#line1} - 2))
+    printf "${GREEN}│${NC} ${BOLD}%s${NC}%*s ${GREEN}│${NC}\n" "$line1" "$pad1" ""
+
+    # Line 2 (gray)
+    local pad2=$((w - ${#line2} - 2))
+    printf "${GREEN}│${NC} ${GRAY}%s${NC}%*s ${GREEN}│${NC}\n" "$line2" "$pad2" ""
+
+    # Bottom border
+    printf "${GREEN}╰"
+    printf '─%.0s' $(seq 1 $w)
+    printf "╯${NC}\n"
     echo ""
 }
 
