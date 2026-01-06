@@ -63,12 +63,10 @@ Use `/brainstorm Should we use Redis or PostgreSQL?` - agents debate from their 
 ### Level 3: Semantic Search
 
 ```bash
-claw leann status              # Check if LEANN installed
-pip install leann              # Install if needed (restart Claude Code after)
-claw leann build               # Build search index
+claw leann build               # Auto-installs LEANN if needed, then builds index
 ```
 
-Use `/search "authentication flow"` in Claude Code.
+Restart Claude Code after install, then use `/search "authentication flow"`.
 
 ---
 

@@ -13,17 +13,30 @@ is_uv_installed() {
     command -v uv &>/dev/null
 }
 
-# Install LEANN via uv
+# Install LEANN (tries pipx, uv, then pip)
 install_leann() {
-    if ! is_uv_installed; then
-        echo "Error: uv is required to install LEANN"
-        echo "Install uv with: curl -LsSf https://astral.sh/uv/install.sh | sh"
-        return 1
+    echo "Installing LEANN..."
+
+    # Try pipx first (isolated install)
+    if command -v pipx &>/dev/null; then
+        echo "Using pipx..."
+        pipx install leann && echo "LEANN installed successfully. Restart Claude Code to use it." && return 0
     fi
 
-    echo "Installing LEANN..."
-    uv tool install leann
-    echo "LEANN installed successfully"
+    # Try uv next
+    if command -v uv &>/dev/null; then
+        echo "Using uv..."
+        uv tool install leann && echo "LEANN installed successfully. Restart Claude Code to use it." && return 0
+    fi
+
+    # Fall back to pip
+    if command -v pip &>/dev/null; then
+        echo "Using pip..."
+        pip install --user leann && echo "LEANN installed successfully. Restart Claude Code to use it." && return 0
+    fi
+
+    echo "Error: No package manager found. Install one of: pipx, uv, or pip"
+    return 1
 }
 
 # Setup LEANN as MCP server
@@ -49,8 +62,18 @@ build_index() {
     local docs_path="${2:-.}"
 
     if ! is_leann_installed; then
-        echo "Error: LEANN is not installed"
-        return 1
+        echo "LEANN is not installed."
+        read -p "Install it now? [Y/n] " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            install_leann || return 1
+            echo ""
+            echo "Run 'claw leann build' again after restarting Claude Code."
+            return 0
+        else
+            echo "Skipped. Install manually with: claw leann install"
+            return 1
+        fi
     fi
 
     echo "Building LEANN index: $index_name"
@@ -79,26 +102,20 @@ leann_status() {
     if is_leann_installed; then
         echo "Installed: Yes"
         echo "Path: $(command -v leann)"
+        echo ""
+        echo "Indexes:"
+        leann list 2>/dev/null | head -20 || echo "  (none)"
     else
         echo "Installed: No"
         echo ""
-        echo "To install LEANN:"
-        echo "  claw leann install"
-    fi
-
-    echo ""
-    if is_uv_installed; then
-        echo "uv: Yes"
-    else
-        echo "uv: No (required for LEANN installation)"
-    fi
-
-    echo ""
-    echo "Available indexes:"
-    if is_leann_installed; then
-        leann list 2>/dev/null | head -20 || echo "  (none)"
-    else
-        echo "  (LEANN not installed)"
+        echo "To install: claw leann install"
+        echo "  (or run 'claw leann build' to auto-install)"
+        echo ""
+        echo "Package managers available:"
+        command -v pipx &>/dev/null && echo "  - pipx (preferred)"
+        command -v uv &>/dev/null && echo "  - uv"
+        command -v pip &>/dev/null && echo "  - pip"
+        ! command -v pipx &>/dev/null && ! command -v uv &>/dev/null && ! command -v pip &>/dev/null && echo "  (none found - install pipx, uv, or pip)"
     fi
 }
 
