@@ -8,7 +8,7 @@
 
 set -euo pipefail
 
-VERSION="0.4.0"
+VERSION="0.4.1"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="${SCRIPT_DIR}/../lib"
 TEMPLATES_DIR="${SCRIPT_DIR}/../templates"
@@ -69,6 +69,8 @@ show_help() {
 cmd_version() {
     echo -e "${BOLD}claw${NC} v${VERSION}"
     echo "Claude Automated Workflow"
+    echo ""
+    echo "https://github.com/bis-code/claude-code-setup"
 }
 
 cmd_detect() {
