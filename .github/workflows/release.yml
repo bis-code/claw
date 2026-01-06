@@ -1,0 +1,208 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v0.4.0
+
+env:
+  HOMEBREW_TAP_REPO: bis-code/homebrew-tap
+  FORMULA_NAME: claw
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Needed to create releases
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Verify version matches bin/claw
+        run: |
+          SCRIPT_VERSION=$(grep '^VERSION=' bin/claw | cut -d'"' -f2)
+          TAG_VERSION=${{ steps.version.outputs.version }}
+          if [[ "$SCRIPT_VERSION" != "$TAG_VERSION" ]]; then
+            echo "Error: Version mismatch!"
+            echo "Tag version: $TAG_VERSION"
+            echo "Script version: $SCRIPT_VERSION"
+            echo ""
+            echo "Please update VERSION in bin/claw to match the tag"
+            exit 1
+          fi
+          echo "Version verified: $TAG_VERSION"
+
+      - name: Create release tarball
+        id: tarball
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          TARBALL_NAME="claw-${VERSION}.tar.gz"
+
+          # Create a clean directory for the release
+          mkdir -p release-build/claw-${VERSION}
+
+          # Copy necessary files
+          cp -r bin release-build/claw-${VERSION}/
+          cp -r lib release-build/claw-${VERSION}/
+          cp -r templates release-build/claw-${VERSION}/
+          cp install.sh release-build/claw-${VERSION}/
+          cp README.md release-build/claw-${VERSION}/
+          cp Makefile release-build/claw-${VERSION}/
+
+          # Create tarball
+          cd release-build
+          tar -czvf "../${TARBALL_NAME}" "claw-${VERSION}"
+          cd ..
+
+          # Calculate SHA256
+          SHA256=$(sha256sum "${TARBALL_NAME}" | cut -d' ' -f1)
+
+          echo "tarball=${TARBALL_NAME}" >> $GITHUB_OUTPUT
+          echo "sha256=${SHA256}" >> $GITHUB_OUTPUT
+
+          echo "Created ${TARBALL_NAME}"
+          echo "SHA256: ${SHA256}"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get commits since last tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [[ -n "$PREV_TAG" ]]; then
+            echo "## Changes since ${PREV_TAG}" > CHANGELOG.md
+            echo "" >> CHANGELOG.md
+            git log ${PREV_TAG}..HEAD --pretty=format:"- %s" >> CHANGELOG.md
+          else
+            echo "## Initial Release" > CHANGELOG.md
+            echo "" >> CHANGELOG.md
+            echo "First release of claw - Claude Automated Workflow" >> CHANGELOG.md
+          fi
+
+          cat CHANGELOG.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: claw v${{ steps.version.outputs.version }}
+          body_path: CHANGELOG.md
+          files: ${{ steps.tarball.outputs.tarball }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Homebrew Tap
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          script: |
+            const version = '${{ steps.version.outputs.version }}';
+            const sha256 = '${{ steps.tarball.outputs.sha256 }}';
+            const formulaRepo = '${{ env.HOMEBREW_TAP_REPO }}';
+            const formulaName = '${{ env.FORMULA_NAME }}';
+
+            // Formula content
+            const formula = `# frozen_string_literal: true
+
+            # Homebrew formula for claw
+            # Claude Automated Workflow - CLI tool to manage Claude Code configurations
+            #
+            # To install:
+            #   brew tap bis-code/tap
+            #   brew install claw
+            #
+            class Claw < Formula
+              desc "Claude Automated Workflow - CLI tool for Claude Code configurations"
+              homepage "https://github.com/bis-code/claude-code-setup"
+              url "https://github.com/bis-code/claude-code-setup/releases/download/v${version}/claw-${version}.tar.gz"
+              sha256 "${sha256}"
+              license "MIT"
+              version "${version}"
+
+              def install
+                bin.install "bin/claw"
+                (lib/"claw").install Dir["lib/*"]
+                (lib/"claw").install "templates"
+
+                inreplace bin/"claw",
+                  'LIB_DIR="\${SCRIPT_DIR}/../lib"',
+                  "LIB_DIR=\\"#{lib}/claw\\""
+              end
+
+              def caveats
+                <<~EOS
+                  To get started:
+                    cd your-project
+                    claw init
+
+                  Available commands:
+                    claw detect      - Detect project type
+                    claw agents      - Manage AI agents
+                    claw leann       - LEANN semantic search
+                    claw help        - Show all commands
+                EOS
+              end
+
+              test do
+                system "#{bin}/claw", "version"
+                system "#{bin}/claw", "help"
+              end
+            end
+            `.trim().replace(/^            /gm, '');
+
+            // Get the current formula file (if exists)
+            const [owner, repo] = formulaRepo.split('/');
+            let fileSha = null;
+
+            try {
+              const { data } = await github.rest.repos.getContent({
+                owner,
+                repo,
+                path: `Formula/${formulaName}.rb`
+              });
+              fileSha = data.sha;
+            } catch (e) {
+              console.log('Formula does not exist yet, will create');
+            }
+
+            // Create or update the formula
+            const response = await github.rest.repos.createOrUpdateFileContents({
+              owner,
+              repo,
+              path: `Formula/${formulaName}.rb`,
+              message: `Update ${formulaName} to v${version}`,
+              content: Buffer.from(formula).toString('base64'),
+              sha: fileSha,
+              committer: {
+                name: 'GitHub Actions',
+                email: 'actions@github.com'
+              }
+            });
+
+            console.log(`Updated formula: ${response.data.content.html_url}`);
+
+  # Run tests before release to ensure quality
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup BATS
+        run: |
+          git clone --depth 1 https://github.com/bats-core/bats-core.git tests/bats
+          git clone --depth 1 https://github.com/bats-core/bats-support.git tests/test_helper/bats-support
+          git clone --depth 1 https://github.com/bats-core/bats-assert.git tests/test_helper/bats-assert
+
+      - name: Run tests
+        run: ./tests/bats/bin/bats tests/*.bats
