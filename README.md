@@ -33,7 +33,7 @@ cd claude-code-setup
 
 claw is designed to grow with your needs. Start simple, add capabilities as you need them.
 
-### Level 1: Basic Setup (30 seconds)
+### Level 1: Basic Setup
 
 Just want Claude Code configured? One command:
 
@@ -54,7 +54,7 @@ claw init
 
 ---
 
-### Level 2: Agent Brainstorming (2 minutes)
+### Level 2: Agent Brainstorming
 
 Want AI personas to debate your decisions? Check what agents are recommended:
 
@@ -79,7 +79,7 @@ The agents will debate from their perspectives (Security will worry about expiry
 
 ---
 
-### Level 3: Semantic Search (5 minutes)
+### Level 3: Semantic Search
 
 Want to search your codebase by meaning, not just keywords?
 
@@ -102,7 +102,7 @@ claw leann build
 
 ---
 
-### Level 4: Multi-Repo Projects (5 minutes)
+### Level 4: Multi-Repo Projects
 
 Working across multiple related repositories?
 
