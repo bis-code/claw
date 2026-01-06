@@ -345,4 +345,7 @@ EOF
     exit $exit_code
 }
 
-main "$@"
+# Only run main if script is executed, not sourced (allows testing)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
