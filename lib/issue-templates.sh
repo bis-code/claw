@@ -213,29 +213,82 @@ handle_templates_command() {
         install)
             check_gh_auth || return 1
 
-            local repo="${1:-}"
-            shift 2>/dev/null || true
+            local repo=""
+            local install_to_project=false
+            local templates=()
 
+            # Parse arguments
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --project|-p)
+                        install_to_project=true
+                        shift
+                        ;;
+                    -*)
+                        echo "Unknown option: $1"
+                        return 1
+                        ;;
+                    *)
+                        if [[ -z "$repo" ]] && [[ "$1" == *"/"* ]]; then
+                            repo="$1"
+                        else
+                            templates+=("$1")
+                        fi
+                        shift
+                        ;;
+                esac
+            done
+
+            # Get templates interactively if none specified
+            if [[ ${#templates[@]} -eq 0 ]]; then
+                local selection
+                selection=$(select_templates_interactive) || return 1
+                read -ra templates <<< "$selection"
+            fi
+
+            # Install to all project repos
+            if [[ "$install_to_project" == "true" ]]; then
+                local project_name
+                project_name=$(get_current_project 2>/dev/null || echo "")
+                if [[ -z "$project_name" ]]; then
+                    echo "Error: Not in a project. Use --project from within a project repo."
+                    return 1
+                fi
+
+                echo "Installing templates to all repos in project: $project_name"
+                echo ""
+
+                local github_repos
+                github_repos=$(get_project_github_repos "$project_name")
+                if [[ -z "$github_repos" ]]; then
+                    echo "No GitHub repos found in project"
+                    return 1
+                fi
+
+                local success_count=0
+                while IFS= read -r github_repo; do
+                    [[ -z "$github_repo" ]] && continue
+                    install_templates_to_repo "$github_repo" "${templates[@]}"
+                    success_count=$((success_count + 1))
+                    echo ""
+                done <<< "$github_repos"
+
+                echo "Installed templates to $success_count repo(s)"
+                return 0
+            fi
+
+            # Single repo install
             if [[ -z "$repo" ]]; then
-                # Try to get current repo
                 repo=$(get_current_repo 2>/dev/null || echo "")
                 if [[ -z "$repo" ]]; then
                     echo "Usage: claw templates install <owner/repo> [template-ids...]"
+                    echo "       claw templates install --project [template-ids...]"
                     echo ""
                     echo "Or run from within a git repo with GitHub remote"
                     return 1
                 fi
                 echo "Using current repo: ${repo}"
                 echo ""
-            fi
-
-            local templates=("$@")
-
-            if [[ ${#templates[@]} -eq 0 ]]; then
-                # Interactive selection
-                local selection
-                selection=$(select_templates_interactive) || return 1
-                read -ra templates <<< "$selection"
             fi
 
             install_templates_to_repo "$repo" "${templates[@]}"
@@ -245,9 +298,10 @@ handle_templates_command() {
 claw templates - Manage GitHub issue templates
 
 Usage:
-  claw templates list                     List available templates
-  claw templates install <repo> [ids...]  Install templates to a repo
-  claw templates install                  Install to current repo (interactive)
+  claw templates list                       List available templates
+  claw templates install <repo> [ids...]    Install templates to a repo
+  claw templates install                    Install to current repo (interactive)
+  claw templates install --project [ids...] Install to ALL repos in project
 
 Available templates:
   bug-report      Bug Report template
@@ -259,8 +313,11 @@ Examples:
   claw templates list
   claw templates install myorg/myrepo
   claw templates install myorg/myrepo bug-report claude-ready
-  claw templates install  # Current repo, interactive selection
+  claw templates install                    # Current repo, interactive
+  claw templates install --project          # All project repos, interactive
+  claw templates install -p bug-report      # All project repos, specific template
 
+Note: --project only works with repos that have GitHub remotes configured.
 The claude-ready template creates issues that appear in /plan-day.
 EOF
             ;;
