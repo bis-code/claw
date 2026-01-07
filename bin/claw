@@ -208,12 +208,14 @@ handle_repos_command() {
             fi
             repos_add "$1"
 
-            # Offer to configure issue templates
-            echo ""
-            read -p "Configure GitHub issue templates for this repo? [y/N] " -n 1 -r
-            echo
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                handle_templates_command install "$1"
+            # Offer to configure issue templates (only in interactive mode)
+            if [[ -t 0 ]]; then
+                echo ""
+                read -p "Configure GitHub issue templates for this repo? [y/N] " -n 1 -r
+                echo
+                if [[ $REPLY =~ ^[Yy]$ ]]; then
+                    handle_templates_command install "$1"
+                fi
             fi
             ;;
         remove|rm)
@@ -227,10 +229,16 @@ handle_repos_command() {
             repos_list
             ;;
         clear)
-            read -p "Clear all tracked repos? [y/N] " -n 1 -r
-            echo
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                repos_clear
+            if [[ -t 0 ]]; then
+                read -p "Clear all tracked repos? [y/N] " -n 1 -r
+                echo
+                if [[ $REPLY =~ ^[Yy]$ ]]; then
+                    repos_clear
+                fi
+            else
+                # Non-interactive mode: require explicit --yes flag
+                echo "Error: clear requires interactive confirmation or use 'claw repos clear --yes'"
+                exit 1
             fi
             ;;
         ""|--help|-h)
