@@ -2,20 +2,24 @@
 
 This rule file governs the autonomous daily development workflow.
 
-## Branch Naming
-- Daily branches: `daily/YYYY-MM-DD`
+## Branch Naming (PR-per-Issue)
+- Issue branches: `issue/<number>-<short-slug>`
+- Examples: `issue/42-payment-modal`, `issue/53-settings-display`
 - Never push directly to main
-- All work for a day goes on a single branch
+- Each issue gets its own branch and PR
+- Fresh branch from main for each issue
 
-## During-Day Commits
-- Can be messy: "wip", "trying x", "fix"
-- Will be squashed at end of day
-- Each commit should still run tests (but doesn't need perfect messages)
+## Commits (PR-per-Issue)
+- Use conventional format: `<type>(<scope>): <description>`
+- Reference issue: `Closes #123` in commit body
+- Each issue gets clean commits since each has its own PR
+- Tests must pass before committing
 
-## Ship-Time Commits
-- Must follow conventional format: `<type>(<scope>): <description>`
-- Must reference issue numbers: `(#123)` or `Closes #123`
-- Must pass all hooks (test coverage validation)
+## PR Requirements
+- One PR per issue (not batched)
+- PR title matches commit message format
+- PR body includes test plan and links to issue
+- CI must pass before merge
 
 ## Pivot Protocol
 - Always log pivots in the daily file with timestamp

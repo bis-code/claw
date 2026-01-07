@@ -1,15 +1,18 @@
 # /done
 
-Mark the current issue as complete.
+Mark the current issue as complete and create a PR.
 
 ## What This Skill Does
 
 1. **RUNS /validate FIRST** (mandatory)
 2. Verifies ALL tests pass (unit, integration, E2E)
-3. Commits current changes (can be messy - will be squashed)
-4. Moves issue from "Active" to "Completed" in state file
-5. Updates GitHub label
-6. Suggests next issue
+3. Commits current changes with proper message
+4. **Creates a PR for this issue** (PR-per-issue workflow)
+5. Moves issue from "Active" to "Completed" in state file
+6. Updates GitHub labels
+7. Suggests next issue (on a fresh branch from main)
+
+**Note:** Each issue gets its own PR for easier review and verification.
 
 **Note:** Completed items are tracked in `~/.claw/daily/YYYY-MM-DD.md` for `/summary` to display (spans all tracked repos).
 
@@ -78,10 +81,15 @@ cd apps/license-portal && npx playwright test [feature].spec.ts
 
 ```bash
 git add -A
-git commit -m "wip: #42 payment modal"
+git commit -m "feat(scope): description
+
+Closes #42
+
+🤖 Generated with Claude Code
+Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
-Note: Commits during the day can be messy. They'll be squashed by `/ship-day`.
+Note: Use proper conventional commit format since each issue gets its own PR.
 
 ### 3. Update State File
 
@@ -96,26 +104,57 @@ Move issue from "Active" to "Completed":
   - commit: abc1234
 ```
 
-### 4. Update GitHub
+### 4. Create Pull Request
+
+Push branch and create PR for this issue:
+
+```bash
+# Push the issue branch
+git push -u origin issue/42-payment-modal
+
+# Create PR linking to the issue
+gh pr create --title "feat(scope): description" \
+  --body "## Summary
+- Brief description of changes
+
+## Test Plan
+- [ ] Tests pass
+- [ ] Manual verification done
+
+Closes #42
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)"
+```
+
+**PR Guidelines:**
+- Title should match the commit message
+- Body should summarize changes and link to issue
+- Include test plan for verification
+
+### 5. Update GitHub Labels
 
 ```bash
 gh issue edit 42 --remove-label "in-progress"
-# Note: Don't add done-today yet - that happens at ship time
+# PR will auto-close the issue when merged
 ```
 
-### 5. Suggest Next
+### 6. Suggest Next
 
 If there are more issues in today's plan:
 
 ```
 ✓ #42 completed!
+✓ PR #15 created: https://github.com/owner/repo/pull/15
 
 Next in plan: #45 - Invoice download feature
   - Scope: S (30 min - 2 hours)
   - This builds on the modal you just created
 
-Run /next to start, or /pivot if plans changed.
+Run /next to start on a fresh branch, or /pivot if plans changed.
 ```
+
+**Important:** The next issue will start on a fresh branch from main, not the current branch.
+This keeps each PR focused on a single issue.
 
 ## Quick Retrospective
 
