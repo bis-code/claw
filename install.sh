@@ -2,7 +2,7 @@
 #
 # install.sh - Installation script for claw
 # x-release-please-start-version
-VERSION="1.1.5"
+VERSION="1.2.0"
 # x-release-please-end
 
 set -euo pipefail
