@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.0](https://github.com/bis-code/claw/compare/v1.1.5...v1.2.0) (2026-01-07)
+
+
+### Features
+
+* **workflow:** implement PR-per-issue workflow ([787a328](https://github.com/bis-code/claw/commit/787a328818347bf82ef6e48840b1553a39b51e8e))
+* **workflow:** implement PR-per-issue workflow ([62479c2](https://github.com/bis-code/claw/commit/62479c20b27970da2effa35d4ae2926cb8691393))
+
+
+### Bug Fixes
+
+* auto-sync VERSION in source files after release ([50fca2a](https://github.com/bis-code/claw/commit/50fca2aab33667c8b7af13e2cefc063f73c5dfc3))
+* Auto-sync VERSION in source files after release ([e4be4c7](https://github.com/bis-code/claw/commit/e4be4c75cba233177025f2822c34221439b838ad))
+
 ## [1.1.5](https://github.com/bis-code/claw/compare/v1.1.4...v1.1.5) (2026-01-07)
 
 
