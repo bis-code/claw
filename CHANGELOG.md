@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/bis-code/claw/compare/v1.1.1...v1.1.2) (2026-01-07)
+
+
+### Bug Fixes
+
+* **release:** add checkout step before tagging ([2d73d7d](https://github.com/bis-code/claw/commit/2d73d7d9a605892c7f0b6abf382bca02588aac15))
+
 ## [1.1.1](https://github.com/bis-code/claw/compare/v1.1.0...v1.1.1) (2026-01-07)
 
 
