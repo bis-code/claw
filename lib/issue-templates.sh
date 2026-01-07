@@ -152,8 +152,9 @@ install_templates_to_repo() {
 
 # Interactive template selection
 select_templates_interactive() {
-    echo "Select templates to install (space to toggle, enter to confirm):"
-    echo ""
+    # All prompts go to stderr so only the result goes to stdout
+    echo "Select templates to install:" >&2
+    echo "" >&2
 
     local selected=()
     local i=0
@@ -163,14 +164,14 @@ select_templates_interactive() {
         local id="${entry%%:*}"
         local rest="${entry#*:}"
         local name="${rest%%:*}"
-        ((i++))
-        echo "  $i) ${id} - ${name}"
+        i=$((i + 1))
+        echo "  $i) ${id} - ${name}" >&2
     done
 
-    echo ""
-    echo "  a) All templates"
-    echo "  q) Cancel"
-    echo ""
+    echo "" >&2
+    echo "  a) All templates" >&2
+    echo "  q) Cancel" >&2
+    echo "" >&2
     read -p "Enter choices (e.g., 1,3 or 'a' for all): " choice
 
     if [[ "$choice" == "q" ]]; then
@@ -193,7 +194,7 @@ select_templates_interactive() {
     fi
 
     if [[ ${#selected[@]} -eq 0 ]]; then
-        echo "No templates selected"
+        echo "No templates selected" >&2
         return 1
     fi
 
