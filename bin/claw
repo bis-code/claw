@@ -8,9 +8,7 @@
 
 set -euo pipefail
 
-# x-release-please-start-version
-VERSION="1.1.4"
-# x-release-please-end
+VERSION="1.1.4" # x-release-please-version
 
 # ============================================================================
 # Configuration
