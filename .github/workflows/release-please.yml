@@ -28,6 +28,13 @@ jobs:
         with:
           release-type: simple
 
+      - name: Checkout repository
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.release.outputs.tag_name }}
+          fetch-depth: 0
+
       - name: Tag major and minor versions
         if: ${{ steps.release.outputs.release_created }}
         run: |
