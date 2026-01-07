@@ -136,7 +136,7 @@ install_templates_to_repo() {
             else
                 echo "  ✓ ${template_id}.md (created)"
             fi
-            ((installed++))
+            installed=$((installed + 1))
         else
             echo "  ✗ ${template_id}.md (API error)"
         fi
