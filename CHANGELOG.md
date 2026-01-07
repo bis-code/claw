@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.4](https://github.com/bis-code/claw/compare/v1.1.3...v1.1.4) (2026-01-07)
+
+
+### Bug Fixes
+
+* **tests:** skip LEANN in CI, use dynamic version check ([9ec006a](https://github.com/bis-code/claw/commit/9ec006aac25ba6cdb674c84d1f0b870bc159d833))
+
 ## [1.1.3](https://github.com/bis-code/claw/compare/v1.1.2...v1.1.3) (2026-01-07)
 
 
