@@ -255,10 +255,11 @@ fetch_all_issues() {
 }
 
 # Show issues summary from all repos
-# Usage: show_issues_summary [--label LABEL]
+# Usage: show_issues_summary [--label LABEL] [--json]
 show_issues_summary() {
     local label=""
     local state="open"
+    local json_output=false
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -270,19 +271,29 @@ show_issues_summary() {
                 state="$2"
                 shift 2
                 ;;
+            --json|-j)
+                json_output=true
+                shift
+                ;;
             *)
                 shift
                 ;;
         esac
     done
 
-    echo "Fetching issues from tracked repos..."
-    echo ""
-
     local issues
     local args=()
     [[ -n "$label" ]] && args+=(--label "$label")
     [[ -n "$state" ]] && args+=(--state "$state")
+
+    # JSON mode: just output raw JSON
+    if [[ "$json_output" == "true" ]]; then
+        fetch_all_issues "${args[@]}"
+        return 0
+    fi
+
+    echo "Fetching issues from tracked repos..."
+    echo ""
 
     issues=$(fetch_all_issues "${args[@]}")
 

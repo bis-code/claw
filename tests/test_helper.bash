@@ -10,6 +10,7 @@ source "$PROJECT_ROOT/lib/detect-project.sh"
 source "$PROJECT_ROOT/lib/agents.sh"
 source "$PROJECT_ROOT/lib/leann-setup.sh"
 source "$PROJECT_ROOT/lib/manifest.sh"
+source "$PROJECT_ROOT/lib/projects.sh"
 
 # Colors (needed by files.sh)
 RED='\033[0;31m'

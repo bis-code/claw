@@ -196,7 +196,8 @@ detect_monorepo_packages() {
 
     # Output packages or just the root if not a monorepo
     if [[ ${#packages[@]} -gt 0 ]]; then
-        printf '%s\n' "${packages[@]}"
+        # Deduplicate packages
+        printf '%s\n' "${packages[@]}" | sort -u
     else
         echo "$dir"
     fi
@@ -341,12 +342,12 @@ detect_multi_repo() {
             if [[ -d "$parent_dir/$sib/.git" ]]; then
                 sib_remote=$(git -C "$parent_dir/$sib" remote get-url origin 2>/dev/null || echo "")
             fi
-            echo "    {"
-            echo "      \"name\": \"$sib\","
-            echo "      \"path\": \"$parent_dir/$sib\","
-            echo "      \"type\": \"$sib_type\""
-            [[ -n "$sib_remote" ]] && echo "      ,\"remote\": \"$sib_remote\""
-            echo -n "    }"
+            echo -n "    {"
+            echo -n "\"name\": \"$sib\", "
+            echo -n "\"path\": \"$parent_dir/$sib\", "
+            echo -n "\"type\": \"$sib_type\""
+            [[ -n "$sib_remote" ]] && echo -n ", \"remote\": \"$sib_remote\""
+            echo -n "}"
         done
         echo ""
         echo "  ]"

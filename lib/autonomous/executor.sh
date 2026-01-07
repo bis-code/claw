@@ -320,11 +320,12 @@ get_task_history() {
 }
 
 # Import issues from GitHub into the task queue
-# Usage: import_from_github [--repo OWNER/REPO] [--label LABEL] [--state STATE]
+# Usage: import_from_github [--repo OWNER/REPO] [--label LABEL] [--state STATE] [--all-repos]
 import_from_github() {
     local repo=""
     local label=""
     local state="open"
+    local all_repos=false
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
@@ -341,6 +342,10 @@ import_from_github() {
                 state="$2"
                 shift 2
                 ;;
+            --all-repos)
+                all_repos=true
+                shift
+                ;;
             *)
                 shift
                 ;;
@@ -353,7 +358,55 @@ import_from_github() {
         return 1
     fi
 
-    # Build gh command
+    local count=0
+
+    # Multi-repo mode: fetch from all tracked repos via claw
+    if [[ "$all_repos" == "true" ]]; then
+        # Try to use claw issues command if available
+        local issues
+        local claw_args=("--json")
+        [[ -n "$label" ]] && claw_args+=("--label" "$label")
+        [[ -n "$state" ]] && claw_args+=("--state" "$state")
+
+        # Check if claw is available
+        if command -v claw &>/dev/null; then
+            issues=$(claw issues "${claw_args[@]}" 2>/dev/null) || issues="[]"
+        else
+            # Fallback: just fetch from current repo
+            local current_repo
+            current_repo=$(git remote get-url origin 2>/dev/null | sed 's/.*github.com[:/]\(.*\)\.git/\1/' || echo "")
+            if [[ -n "$current_repo" ]]; then
+                local gh_args=("issue" "list" "--repo" "$current_repo" "--json" "number,title,labels,body,repository" "--state" "$state")
+                [[ -n "$label" ]] && gh_args+=("--label" "$label")
+                issues=$(gh "${gh_args[@]}" 2>/dev/null) || issues="[]"
+            else
+                issues="[]"
+            fi
+        fi
+
+        # Add each issue as a task
+        if command -v jq &>/dev/null; then
+            while IFS= read -r issue; do
+                local number title issue_repo
+                number=$(echo "$issue" | jq -r '.number')
+                title=$(echo "$issue" | jq -r '.title')
+                issue_repo=$(echo "$issue" | jq -r '.repository.nameWithOwner // empty')
+
+                if [[ -n "$number" && "$number" != "null" ]]; then
+                    # Include repo in task description for multi-repo context
+                    local task_desc="$title"
+                    [[ -n "$issue_repo" ]] && task_desc="[$issue_repo] $title"
+                    add_task "$task_desc" "medium" --github-issue "$number" >/dev/null
+                    ((count++)) || true
+                fi
+            done < <(echo "$issues" | jq -c '.[]')
+        fi
+
+        echo "Imported $count issues from tracked repos"
+        return 0
+    fi
+
+    # Single repo mode (original behavior)
     local gh_args=("issue" "list" "--json" "number,title,labels,body" "--state" "$state")
     [[ -n "$repo" ]] && gh_args+=("--repo" "$repo")
     [[ -n "$label" ]] && gh_args+=("--label" "$label")
@@ -366,7 +419,6 @@ import_from_github() {
     }
 
     # Add each issue as a task
-    local count=0
     if command -v jq &>/dev/null; then
         while IFS= read -r issue; do
             local number title

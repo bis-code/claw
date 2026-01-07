@@ -25,6 +25,7 @@ LIB_DIR="${SCRIPT_DIR}/../lib"
 source "${LIB_DIR}/repos.sh"
 source "${LIB_DIR}/leann-mcp.sh"
 source "${LIB_DIR}/issue-templates.sh"
+source "${LIB_DIR}/projects.sh"
 
 # ============================================================================
 # Colors
@@ -141,6 +142,20 @@ show_startup_banner() {
     local current_repo
     current_repo=$(get_current_repo 2>/dev/null || echo "")
 
+    # Check for project context
+    local current_project
+    current_project=$(get_current_project 2>/dev/null || echo "")
+
+    local project_repo_count=0
+    if [[ -n "$current_project" ]]; then
+        local config_file
+        config_file=$(get_project_config "$current_project" 2>/dev/null)
+        if [[ -f "$config_file" ]]; then
+            project_repo_count=$(jq '.repos | length' "$config_file" 2>/dev/null || echo 0)
+        fi
+    fi
+
+    # Legacy tracked repos
     local tracked_count=0
     if [[ -f "$CLAW_HOME/repos.json" ]]; then
         tracked_count=$(jq '.repos | length' "$CLAW_HOME/repos.json" 2>/dev/null || echo 0)
@@ -173,18 +188,21 @@ show_startup_banner() {
     print_line " ${BOLD}Command Line${NC}           ${CYAN}${BOLD}Status${NC}"
     print_line " ${BOLD}Automated Workflow${NC}     Claude: ${claude_status_color}${claude_status_icon}${NC} ready"
 
+    # Show project context (if in a project)
+    if [[ -n "$current_project" ]]; then
+        print_line "                        Project: ${GREEN}${current_project}${NC} (${project_repo_count} repos)"
+    fi
+
     # Show current repo
     if [[ -n "$current_repo" ]]; then
-        print_line "                        Current: ${GREEN}${current_repo}${NC}"
+        print_line "                        Repo: ${GREEN}${current_repo}${NC}"
     else
         print_line "                        ${GRAY}Not in a git repo${NC}"
     fi
 
-    # Show tracked repos
-    if [[ $tracked_count -gt 0 ]]; then
+    # Show legacy tracked repos (if any and no project)
+    if [[ -z "$current_project" ]] && [[ $tracked_count -gt 0 ]]; then
         print_line "                        Tracked: ${CYAN}${tracked_count} repo(s)${NC}"
-    else
-        print_line "                        ${GRAY}No repos tracked${NC}"
     fi
 
     print_line ""
@@ -322,21 +340,29 @@ Options:
   --yolo, -y                Skip all permission prompts (DANGEROUS)
                             Passes --dangerously-skip-permissions to claude
 
+Project management (recommended):
+  claw project create <name>    Create a new project
+  claw project add-repo <path>  Add local folder to project
+  claw project list             List all projects
+  claw project show             Show current project details
+  claw project issues           Fetch issues from all project repos
+  claw project --help           More info
+
 GitHub issue templates:
   claw templates list           List available templates
   claw templates install <repo> Install templates to a repo
   claw templates --help         More info
 
-Multi-repo tracking:
-  claw repos add <owner/repo>   Add a repo to track
+Legacy multi-repo tracking:
+  claw repos add <owner/repo>   Add a repo to track (by GitHub name)
   claw repos list               List tracked repos
-  claw repos remove <owner/repo> Remove a repo
   claw repos --help             More info
 
 Claw adds:
+  - Project-based multi-repo management (local folders)
   - Semantic code search via leann MCP (auto-installed on first run)
   - Global commands: /plan-day, /ship-day, /brainstorm, etc.
-  - Multi-repo: aggregate issues across tracked repos
+  - Multi-repo: aggregate issues across project repos
   - Session ID shown on exit for easy resume
   - Available in any project without setup
 
@@ -361,15 +387,28 @@ EOF
             exit $?
             ;;
         repos)
-            # Multi-repo management
+            # Legacy multi-repo management
             shift
             handle_repos_command "$@"
             exit $?
             ;;
-        issues)
-            # Fetch issues from all repos
+        project)
+            # Project-based multi-repo management
             shift
-            show_issues_summary "$@"
+            handle_project_command "$@"
+            exit $?
+            ;;
+        issues)
+            # Fetch issues from all repos (project-aware)
+            shift
+            # Try project-aware fetch first, fall back to legacy
+            local current_project
+            current_project=$(get_current_project 2>/dev/null || echo "")
+            if [[ -n "$current_project" ]]; then
+                handle_project_command issues "$@"
+            else
+                show_issues_summary "$@"
+            fi
             exit $?
             ;;
         templates)

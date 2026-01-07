@@ -204,3 +204,74 @@ EOF
     assert_success
     assert_output --partial '"type":'
 }
+
+# ============================================================================
+# Project-based Multi-Repo Issue Fetching Tests
+# ============================================================================
+
+@test "project: fetch_project_issues returns empty array when no project" {
+    # Source projects module
+    source "$PROJECT_ROOT/lib/projects.sh"
+
+    # Not in a project
+    cd "$TMP_DIR"
+
+    run fetch_project_issues
+    assert_success
+    # Should return empty JSON array (deduplicated)
+    [[ "$output" == "[]" ]] || [[ -z "$output" ]]
+}
+
+@test "project: get_project_github_repos returns repos for project" {
+    source "$PROJECT_ROOT/lib/projects.sh"
+
+    # Create project with repos
+    project_create "test-proj"
+
+    mkdir -p "$TMP_DIR/repo1"
+    cd "$TMP_DIR/repo1"
+    git init -q
+    git remote add origin "https://github.com/org/backend.git"
+    project_add_repo "$TMP_DIR/repo1" --project test-proj
+
+    mkdir -p "$TMP_DIR/repo2"
+    cd "$TMP_DIR/repo2"
+    git init -q
+    git remote add origin "https://github.com/org/frontend.git"
+    project_add_repo "$TMP_DIR/repo2" --project test-proj
+
+    run get_project_github_repos "test-proj"
+    assert_success
+    assert_output --partial "org/backend"
+    assert_output --partial "org/frontend"
+}
+
+@test "repos: show_issues_summary with --json returns JSON" {
+    source "$PROJECT_ROOT/lib/repos.sh"
+
+    # Mock gh to return test data
+    function gh() {
+        echo '[{"number": 1, "title": "Test issue", "labels": [], "repository": {"nameWithOwner": "test/repo"}}]'
+    }
+    export -f gh
+
+    repos_add "test/repo"
+
+    run show_issues_summary --json
+    assert_success
+    # Should output JSON
+    assert_output --partial "number"
+}
+
+# ============================================================================
+# Executor Multi-Repo Tests
+# ============================================================================
+
+@test "executor: import_from_github has --all-repos flag" {
+    source "$PROJECT_ROOT/lib/autonomous/executor.sh"
+
+    # Check that the function accepts the flag (verify signature)
+    run type import_from_github
+    assert_success
+    assert_output --partial "all_repos"
+}

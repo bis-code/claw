@@ -162,11 +162,25 @@ Detect project stage from context and adjust:
 
 ### Step 2: Gather Candidates
 
-**Default: Fetch from GitHub**
+**Default: Fetch from ALL tracked repos**
+
+If running via `claw`:
 ```bash
-gh issue list --label "claude-ready" --state open \
-  --json number,title,labels,body,milestone
+claw issues --label "claude-ready" --json
 ```
+
+If running via `claude` directly, fetch from each repo:
+```bash
+# Get current repo
+CURRENT_REPO=$(git remote get-url origin | sed 's/.*github.com[:/]\(.*\)\.git/\1/')
+
+# Fetch issues from current repo + any tracked repos
+gh issue list --repo "$CURRENT_REPO" --label "claude-ready" --state open \
+  --json number,title,labels,body,milestone,repository
+```
+
+**Multi-repo aggregation**: When multiple repos are tracked (`claw repos list`),
+issues are fetched from ALL repos and grouped by repository in the plan.
 
 **Sort by priority labels**: P1-high > P2-medium > P3-low
 
@@ -200,41 +214,61 @@ Sum estimates of BUILD items:
 
 ### Step 5: Present Plan for Approval
 
+**Multi-Repo Grouping:** When working with a project containing multiple repos,
+group issues by repository and show repo type for clarity:
+
 ```markdown
 ## Today's Plan (4 hours available)
 
 ### Build (3h total)
+
+#### acme-api (API)
 | Order | Issue | Est | Lens Summary |
 |-------|-------|-----|--------------|
-| 1 | #53 Settings display | 1h | High value, low risk |
-| 2 | #52 Provider error | 1.5h | High value, low risk |
-| 3 | #56 Remove quit button | 0.5h | Low value, no risk (filler) |
+| 1 | #12 Add rate limiting | 1h | High value, security |
+| 2 | #15 Fix auth middleware | 0.5h | High value, unblocks dashboard |
+
+#### acme-dashboard (Web)
+| Order | Issue | Est | Lens Summary |
+|-------|-------|-----|--------------|
+| 3 | #8 Dark mode toggle | 1h | Medium value, UX |
+| 4 | #10 Settings page | 0.5h | Low value, depends on api #15 |
+
+#### acme-worker (Service)
+(no issues selected for today)
+
+### Cross-Repo Dependencies
+- dashboard/#10 depends on api/#15 (auth changes)
+- Work order: api first, then dashboard
 
 ### Defer
-| Issue | Reason | Revisit |
-|-------|--------|---------|
-| #58 API encryption | 4h exceeds budget | Tomorrow with full focus |
-| #47 License sync | Already in-progress | Check status first |
+| Repo | Issue | Reason | Revisit |
+|------|-------|--------|---------|
+| api | #18 API key encryption | 4h exceeds budget | Tomorrow |
+| worker | #3 Job retry logic | Needs design review | Next sprint |
 
 ### Reject
-| Issue | Reason |
-|-------|--------|
-| #36 Discord bot | Needs discussion, not ready |
+| Repo | Issue | Reason |
+|------|-------|--------|
+| dashboard | #6 Slack integration | Needs discussion, not ready |
 
 ### Lens Summary
-- **Value focus**: UX improvements blocking adoption
-- **Key risks**: None significant today
-- **Security**: No sensitive changes in today's batch
+- **Value focus**: Auth improvements blocking production
+- **Key risks**: Cross-repo dependency on #15
+- **Security**: API auth changes need careful review
 
 ### Conflicts Resolved
-- #52 vs #53: Both high value, chose #53 first (unblocks #52)
+- api/#12 vs #15: Both high value, chose #15 first (unblocks #10)
 
 ### Trade-offs Accepted
-- [ ] Shipping #56 without full design review (trivial change)
+- [ ] dashboard/#8 without full design review (trivial change)
 
 ---
 Approve? (y/n/modify)
 ```
+
+**Single Repo Mode:** When only one repo is tracked, omit the grouping headers
+and show the flat table format.
 
 ### Step 6: On Approval
 
@@ -289,9 +323,25 @@ started: 09:00
 - [x] #53 - Settings display
   - PR: #15 (https://github.com/owner/repo/pull/15)
   - Completed: 10:30
+- [x] #52 - Provider error
+  - PR: #16 (https://github.com/owner/repo/pull/16)
+  - Completed: 12:15
 
 ### Deferred
 - #58 - API encryption (revisit tomorrow)
+
+## PR Merge Order
+
+Track PRs and their merge order/dependencies:
+
+| PR | Issue | Status | Depends On | Merge Order |
+|----|-------|--------|------------|-------------|
+| #15 | #53 | Open | - | 1 (first) |
+| #16 | #52 | Open | - | 2 |
+| #17 | #56 | Open | #15 | 3 (after #15 merges) |
+
+**Independent PRs** can merge in any order.
+**Dependent PRs** must wait for their dependency to merge first.
 
 ## Decisions Made
 | Issue | Outcome | Rationale |
@@ -305,10 +355,56 @@ started: 09:00
 ## Session Log
 - 09:00 - Planning started
 - 09:15 - Plan approved, starting #53
+- 10:30 - PR #15 created, starting #52
+- 12:15 - PR #16 created, starting #56
 
 ## End of Day
 (filled by /ship-day)
 ```
+
+---
+
+## Parallel PR Workflow
+
+With `branch_strategy: pr-per-issue`, each issue gets its own branch and PR.
+This enables parallel work without waiting for merges:
+
+### How It Works
+
+1. **Start issue #1** from main: `git checkout -b issue/53-settings-display`
+2. **Work on issue #1**, create PR #15
+3. **Start issue #2** from main: `git checkout main && git pull && git checkout -b issue/52-provider-error`
+4. **Work on issue #2**, create PR #16
+5. PRs can be reviewed and merged independently
+
+### Handling Dependencies
+
+When issue #2 depends on issue #1's changes:
+
+**Option A: Wait for merge** (safest)
+- Create PR #15 for issue #1
+- Wait for review and merge
+- Pull main, start issue #2
+
+**Option B: Chain branches** (faster, more complex)
+- Create PR #15 for issue #1 (base: main)
+- Start issue #2 from issue #1's branch: `git checkout -b issue/52-provider-error issue/53-settings-display`
+- Create PR #16 for issue #2 (base: issue/53-settings-display)
+- When PR #15 merges, update PR #16's base to main
+
+**Option C: Independent PRs** (if changes are isolated)
+- Both PRs target main
+- Merge whichever is ready first
+- Handle merge conflicts if they arise
+
+### Merge Order Tracking
+
+The daily state file tracks:
+- **Which PRs are open** (not yet merged)
+- **Dependencies** between PRs
+- **Suggested merge order**
+
+Use `/ship-day` to see all open PRs and suggested merge order.
 
 ---
 

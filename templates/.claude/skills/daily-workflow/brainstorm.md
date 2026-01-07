@@ -202,13 +202,27 @@ Use: gh issue create --title "UX: X" --label "ux-improvement"
 
 ## Implementation
 
-### Step 1: Fetch Issues
+### Step 1: Fetch Issues (Multi-Repo)
 
+**Fetch from ALL tracked repos:**
+
+If running via `claw`:
 ```bash
-gh issue list --label "claude-ready" --state open \
-  --json number,title,body,labels \
+claw issues --label "claude-ready" --json > /tmp/brainstorm-issues.json
+```
+
+If running via `claude` directly:
+```bash
+# Current repo
+CURRENT_REPO=$(git remote get-url origin | sed 's/.*github.com[:/]\(.*\)\.git/\1/')
+gh issue list --repo "$CURRENT_REPO" --label "claude-ready" --state open \
+  --json number,title,body,labels,repository \
   > /tmp/brainstorm-issues.json
 ```
+
+**Multi-repo context:** When issues come from multiple repos, agents analyze
+cross-repo dependencies and provide context-aware recommendations. Issues are
+presented grouped by repository so agents understand the broader project context.
 
 ### Step 2: Spawn Parallel Agents
 

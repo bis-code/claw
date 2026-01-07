@@ -49,8 +49,11 @@ teardown() {
 @test "claw: help includes multi-repo section" {
     run "$PROJECT_ROOT/bin/claw" --help
     assert_success
-    assert_output --partial "Multi-repo tracking"
-    assert_output --partial "claw repos add"
+    # Updated to match new help text - project management is primary, repos is legacy
+    assert_output --partial "Project management"
+    assert_output --partial "claw project"
+    assert_output --partial "Legacy multi-repo"
+    assert_output --partial "claw repos"
 }
 
 # ============================================================================
@@ -162,13 +165,16 @@ teardown() {
     assert_output --partial "2 repo(s)"
 }
 
-@test "claw: banner shows no repos tracked when empty" {
+@test "claw: banner shows repo info when in git repo" {
     source "$PROJECT_ROOT/lib/repos.sh"
+    source "$PROJECT_ROOT/lib/projects.sh"
     source "$PROJECT_ROOT/bin/claw"
 
     run show_startup_banner
     assert_success
-    assert_output --partial "No repos tracked"
+    # When in a git repo, shows repo info (not "No repos tracked" anymore)
+    # The banner now shows project or repo info, legacy tracked repos only shown when present
+    assert_output --partial "Repo:"
 }
 
 # ============================================================================

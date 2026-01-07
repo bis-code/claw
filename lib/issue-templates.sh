@@ -65,7 +65,7 @@ get_template_content() {
     cat "$template_file"
 }
 
-# Install templates to a repo
+# Install templates to a repo using GitHub API (no clone needed)
 install_templates_to_repo() {
     local repo="$1"
     shift
@@ -79,63 +79,68 @@ install_templates_to_repo() {
     echo "Installing templates to ${repo}..."
     echo ""
 
-    # Clone repo to temp dir
-    local tmp_dir
-    tmp_dir=$(mktemp -d)
-    trap "rm -rf '$tmp_dir'" EXIT
-
-    if ! gh repo clone "$repo" "$tmp_dir" -- --depth 1 2>/dev/null; then
-        echo "Error: Failed to clone ${repo}" >&2
+    # Get default branch
+    local default_branch
+    default_branch=$(gh api "repos/${repo}" --jq '.default_branch' 2>/dev/null) || {
+        echo "Error: Could not determine default branch for ${repo}" >&2
         return 1
-    fi
+    }
 
-    # Create .github/ISSUE_TEMPLATE directory
-    mkdir -p "${tmp_dir}/.github/ISSUE_TEMPLATE"
-
-    # Copy selected templates
+    # Install each template via GitHub API (no clone needed!)
     local installed=0
     for template_id in "${templates[@]}"; do
         local src="${ISSUE_TEMPLATES_DIR}/${template_id}.md"
-        local dest="${tmp_dir}/.github/ISSUE_TEMPLATE/${template_id}.md"
+        local path=".github/ISSUE_TEMPLATE/${template_id}.md"
 
-        if [[ -f "$src" ]]; then
-            cp "$src" "$dest"
-            echo "  ✓ ${template_id}.md"
+        if [[ ! -f "$src" ]]; then
+            echo "  ✗ ${template_id}.md (template not found locally)"
+            continue
+        fi
+
+        # Read content and base64 encode
+        local content
+        content=$(base64 < "$src")
+
+        # Check if file already exists
+        local existing_sha=""
+        existing_sha=$(gh api "repos/${repo}/contents/${path}" --jq '.sha' 2>/dev/null || echo "")
+
+        # Create or update file via API
+        local api_body
+        if [[ -n "$existing_sha" ]]; then
+            api_body=$(jq -n \
+                --arg msg "Update ${template_id} issue template" \
+                --arg content "$content" \
+                --arg branch "$default_branch" \
+                --arg sha "$existing_sha" \
+                '{message: $msg, content: $content, branch: $branch, sha: $sha}')
+        else
+            api_body=$(jq -n \
+                --arg msg "Add ${template_id} issue template" \
+                --arg content "$content" \
+                --arg branch "$default_branch" \
+                '{message: $msg, content: $content, branch: $branch}')
+        fi
+
+        if gh api "repos/${repo}/contents/${path}" \
+            --method PUT \
+            --input - <<< "$api_body" &>/dev/null; then
+            if [[ -n "$existing_sha" ]]; then
+                echo "  ✓ ${template_id}.md (updated)"
+            else
+                echo "  ✓ ${template_id}.md (created)"
+            fi
             ((installed++))
         else
-            echo "  ✗ ${template_id}.md (not found)"
+            echo "  ✗ ${template_id}.md (API error)"
         fi
     done
 
-    if [[ $installed -eq 0 ]]; then
-        echo "No templates installed"
-        return 0
-    fi
-
-    # Commit and push
-    cd "$tmp_dir"
-    git add .github/ISSUE_TEMPLATE/
-
-    if git diff --cached --quiet; then
-        echo ""
-        echo "No changes to commit (templates may already exist)"
-        return 0
-    fi
-
-    git commit -m "Add GitHub issue templates
-
-Installed via claw templates command.
-Templates: ${templates[*]}
-
-🤖 Generated with claw (https://github.com/bis-code/claw)"
-
-    if git push origin HEAD; then
-        echo ""
-        echo "✓ Templates installed to ${repo}"
+    echo ""
+    if [[ $installed -gt 0 ]]; then
+        echo "✓ Installed ${installed} template(s) to ${repo}"
     else
-        echo ""
-        echo "Error: Failed to push changes" >&2
-        return 1
+        echo "No templates were installed"
     fi
 }
 

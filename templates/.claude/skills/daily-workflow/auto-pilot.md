@@ -6,7 +6,7 @@ Fully autonomous development mode. AI discovers, plans, executes, and ships.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `--hours` | **4** | Time budget before auto-shipping |
+| `--hours` | **4** | Time budget for ENTIRE cycle (discovery + execution) |
 | `--discovery` | **shallow** | Quick scan (TODOs + recent changes) |
 | `--focus` | *none* | All areas (optional to specify) |
 
@@ -14,23 +14,42 @@ Fully autonomous development mode. AI discovers, plans, executes, and ships.
 
 ## What This Skill Does
 
-1. **Discovers** work by analyzing the codebase (not just existing issues)
-2. **Creates** GitHub issues for discoveries
-3. **Brainstorms** with multi-agent planning
-4. **Executes** implementations with TDD
-5. **Ships** at end of day with single PR
-6. **Reports** with full summary of what was done
+**IMPORTANT:** Auto-pilot runs a COMPLETE cycle by default. It does NOT stop after discovery.
+
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│  DISCOVER   │───▶│   EXECUTE   │───▶│    SHIP     │───▶│   REPORT    │
+│  (phase 1)  │    │  (phase 4)  │    │  (phase 5)  │    │             │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+     │                    │
+     ▼                    ▼
+ Creates issues      Works on discovered
+ + existing ones     AND existing issues
+```
+
+1. **Discovers** work by analyzing the codebase (creates GitHub issues)
+2. **Aggregates** discovered issues with existing `claude-ready` issues
+3. **Brainstorms** with multi-agent planning on ALL issues
+4. **Executes** implementations with TDD (works through the queue)
+5. **Ships** completed work (creates PRs, closes issues)
+6. **Reports** with full summary of discovered + completed items
+
+**Time budget applies to the ENTIRE cycle**, not just execution.
 
 ## Invocation
 
 ```
-/auto-pilot                      # Full autonomous mode (4 hours, shallow discovery)
-/auto-pilot --hours 8            # Extended session
-/auto-pilot --discover-only      # Just discover, don't execute
-/auto-pilot --focus "billing"    # Focus on specific area
-/auto-pilot --discovery deep     # Full codebase scan
-/auto-pilot --discovery none     # Skip discovery, use existing issues only
+/auto-pilot                      # Full cycle: discover → execute → ship (4 hours)
+/auto-pilot --hours 8            # Extended 8-hour session
+/auto-pilot --discover-only      # ONLY discover, create issues, then stop
+/auto-pilot --focus "billing"    # Focus discovery + execution on billing area
+/auto-pilot --discovery deep     # Full codebase scan (then execute)
+/auto-pilot --discovery none     # Skip discovery, execute existing issues only
 ```
+
+**Key distinction:**
+- Default: Discovers work, creates issues, then EXECUTES them
+- `--discover-only`: Creates issues but does NOT execute (for planning ahead)
 
 ---
 
@@ -129,20 +148,38 @@ Unit tests only"
 
 ## Phase 2: Aggregate & Prioritize
 
+**This phase happens IMMEDIATELY after discovery** (unless `--discover-only`).
+
 After discovery, the orchestrator:
 
-1. **Fetches all issues** (existing + just created)
+1. **Fetches all issues from ALL tracked repos** (existing + just created)
 2. **Deduplicates** (don't create issue for something already tracked)
 3. **Prioritizes** based on:
    - Security issues → P0 (do today)
    - Test coverage gaps on critical paths → P1
    - Tech debt in active areas → P2
    - TODOs and minor improvements → P3
+4. **Passes prioritized list to execution phase** (no user intervention)
 
+**Multi-repo aggregation:**
+
+If running via `claw`:
 ```bash
-# Get all claude-ready issues
-gh issue list --label "claude-ready" --state open --json number,title,labels,body
+# Fetches from ALL tracked repos (current + claw repos list)
+claw issues --label "claude-ready" --json
 ```
+
+If running via `claude` directly:
+```bash
+# Current repo only (fallback)
+CURRENT_REPO=$(git remote get-url origin | sed 's/.*github.com[:/]\(.*\)\.git/\1/')
+gh issue list --repo "$CURRENT_REPO" --label "claude-ready" --state open \
+  --json number,title,labels,body,repository
+```
+
+**Cross-repo discovery:** When working with multiple repos, discovery agents run
+in the current working directory but issues can be created in any tracked repo.
+The aggregator groups issues by repository for prioritization.
 
 ---
 
