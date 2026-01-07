@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.3](https://github.com/bis-code/claw/compare/v1.1.2...v1.1.3) (2026-01-07)
+
+
+### Bug Fixes
+
+* **repos:** skip interactive prompts in non-TTY mode ([af252ba](https://github.com/bis-code/claw/commit/af252ba2c8bd9589e6b896e015dd4ef703f05621))
+
 ## [1.1.2](https://github.com/bis-code/claw/compare/v1.1.1...v1.1.2) (2026-01-07)
 
 
