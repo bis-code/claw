@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.1.0](https://github.com/bis-code/claw/compare/v1.0.1...v1.1.0) (2026-01-07)
+
+
+### Features
+
+* add --yolo flag to skip permission prompts ([#6](https://github.com/bis-code/claw/issues/6)) ([b0862c4](https://github.com/bis-code/claw/commit/b0862c4a9f93d661aa7a71ee713a69d770aa8025))
+* add /summary skill for daily work tracking ([#7](https://github.com/bis-code/claw/issues/7)) ([eb58e5a](https://github.com/bis-code/claw/commit/eb58e5a2f514bf8506d7bf54e53c4028cdd4d76e))
+* add GitHub issue templates command ([#5](https://github.com/bis-code/claw/issues/5)) ([ded1a5e](https://github.com/bis-code/claw/commit/ded1a5e3d9ce9c5447b21557e99b7243ea497671))
+
+
+### Bug Fixes
+
+* add LIB_DIR variable for homebrew compatibility ([003308e](https://github.com/bis-code/claw/commit/003308ed8f84a284581298c56575007af25b080c))
+
 ## [1.0.0](https://github.com/bis-code/claw/compare/v0.4.1...v1.0.0) (2026-01-07)
 
 
