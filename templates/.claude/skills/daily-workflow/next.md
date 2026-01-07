@@ -1,14 +1,19 @@
 # /next
 
-Pick up the next issue from today's plan.
+Pick up the next issue from today's plan on a fresh branch.
 
 ## What This Skill Does
 
-1. Reads the current daily state file
-2. Finds the next pending issue in the plan
-3. Moves it to "Active" status
-4. Updates GitHub label to `in-progress`
-5. Provides context for starting work
+1. **Switches to main and pulls latest** (fresh start)
+2. **Creates issue-specific branch** (`issue/<number>-<slug>`)
+3. Reads the current daily state file
+4. Finds the next pending issue in the plan
+5. Moves it to "Active" status
+6. Updates GitHub label to `in-progress`
+7. Provides context for starting work
+
+**Branch Strategy:** Each issue gets its own branch from main.
+This enables PR-per-issue workflow for easier review.
 
 ## Invocation
 
@@ -24,36 +29,58 @@ Or to pick a specific issue:
 
 ## Steps
 
-### 1. Read Current State
+### 1. Switch to Main and Pull Latest
 
 ```bash
-cat .claude/daily/$(date +%Y-%m-%d).md
+git checkout main
+git pull origin main
 ```
 
-### 2. Find Next Issue
+### 2. Read Current State
 
-- If no specific issue requested, pick the first from "Planned"
+```bash
+cat ~/.claw/daily/$(date +%Y-%m-%d).md
+```
+
+### 3. Find Next Issue
+
+- If no specific issue requested, pick the first from "Queued"
 - If issue specified, verify it's in today's plan
 
-### 3. Update State File
+### 4. Create Issue Branch
 
-Move issue from "Planned" to "Active":
+```bash
+# Create branch with issue number and slug
+git checkout -b issue/42-payment-modal
+
+# Branch naming convention:
+# issue/<number>-<short-slug>
+# Examples:
+#   issue/42-payment-modal
+#   issue/53-settings-display
+#   issue/14-version-sync
+```
+
+### 5. Update State File
+
+Move issue from "Queued" to "Active":
 
 ```markdown
 ### Active
 - [ ] #42 - Add payment method update modal
   - status: in_progress
   - started: 10:30
+  - branch: issue/42-payment-modal
   - notes:
 ```
 
-### 4. Update GitHub
+### 6. Update GitHub
 
 ```bash
 gh issue edit 42 --add-label "in-progress"
 ```
 
-### 5. Provide Context
+### 7. Provide Context
 
 Fetch and summarize the issue:
 

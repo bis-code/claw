@@ -239,14 +239,21 @@ Approve? (y/n/modify)
 ### Step 6: On Approval
 
 ```bash
-# Create daily branch
-git checkout -b daily/$(date +%Y-%m-%d)
+# Start fresh from main
+git checkout main
+git pull origin main
 
-# Mark first issue
+# Create branch for FIRST issue only
+git checkout -b issue/53-settings-display
+
+# Mark first issue as in-progress
 gh issue edit 53 --add-label "in-progress"
 ```
 
-Create state file: `.claude/daily/YYYY-MM-DD.md`
+**Branch Strategy:** Each issue gets its own branch (`issue/<number>-<slug>`).
+When `/done` is called, a PR is created and `/next` starts a fresh branch for the next issue.
+
+Create state file: `~/.claw/daily/YYYY-MM-DD.md`
 
 ---
 
@@ -258,7 +265,7 @@ Create state file: `.claude/daily/YYYY-MM-DD.md`
 ## Config
 hours_available: 4
 maturity: startup
-branch: daily/YYYY-MM-DD
+branch_strategy: pr-per-issue
 started: 09:00
 
 ## Lens Settings
@@ -271,6 +278,7 @@ started: 09:00
 ### Active
 - [ ] #53 - Settings display (~1h)
   - Status: in-progress
+  - Branch: issue/53-settings-display
   - Started: 09:15
 
 ### Queued
@@ -278,7 +286,9 @@ started: 09:00
 - [ ] #56 - Remove quit button (~0.5h)
 
 ### Completed
-(moves here when done)
+- [x] #53 - Settings display
+  - PR: #15 (https://github.com/owner/repo/pull/15)
+  - Completed: 10:30
 
 ### Deferred
 - #58 - API encryption (revisit tomorrow)
