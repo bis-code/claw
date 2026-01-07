@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.5](https://github.com/bis-code/claw/compare/v1.1.4...v1.1.5) (2026-01-07)
+
+
+### Bug Fixes
+
+* **release:** sync install.sh version to manifest ([cab2f98](https://github.com/bis-code/claw/commit/cab2f98d02305628a56bab1b9028e5a2c9add897))
+* **release:** use block annotation format for version ([8c0991c](https://github.com/bis-code/claw/commit/8c0991cc17667a828c7ab8557f802f4269b9fc1a))
+* **release:** use generic updater for bin/claw version ([557ca24](https://github.com/bis-code/claw/commit/557ca24c445b834df0ea95205fc2a5fe0fa82317))
+* **release:** use inline version marker for release-please ([b1e7687](https://github.com/bis-code/claw/commit/b1e76875d30835139d4b0c4bea6b60b2da60adee))
+
 ## [1.1.4](https://github.com/bis-code/claw/compare/v1.1.3...v1.1.4) (2026-01-07)
 
 
