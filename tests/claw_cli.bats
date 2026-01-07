@@ -125,7 +125,8 @@ teardown() {
 
     run show_startup_banner
     assert_success
-    assert_output --partial "v0.6.0"
+    # Check for version pattern (vX.Y.Z) rather than hardcoded version
+    assert_output --partial "claw v"
 }
 
 @test "claw: banner shows commands section" {

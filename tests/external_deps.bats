@@ -46,8 +46,16 @@ skip_if_no_gh_auth() {
 }
 
 skip_if_no_leann() {
+    # Skip in CI environments - leann tests require local installation
+    if [[ -n "${CI:-}" ]] || [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+        skip "LEANN tests skipped in CI"
+    fi
     if ! command -v leann &>/dev/null; then
         skip "LEANN not installed"
+    fi
+    # Verify leann actually works (not just installed but broken)
+    if ! leann list &>/dev/null; then
+        skip "LEANN installed but not functional"
     fi
 }
 
