@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.1](https://github.com/bis-code/claw/compare/v1.1.0...v1.1.1) (2026-01-07)
+
+
+### Bug Fixes
+
+* add bin/claw to release-please extra-files ([e96e5cc](https://github.com/bis-code/claw/commit/e96e5cc7a1f9a3f25e01fe70d70f7afe581fe5ea))
+* combine release workflows for autonomous releases ([40de9af](https://github.com/bis-code/claw/commit/40de9afe5a914d69a86498fb513dc090514401e6))
+
 ## [1.1.0](https://github.com/bis-code/claw/compare/v1.0.1...v1.1.0) (2026-01-07)
 
 
