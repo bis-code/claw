@@ -66,10 +66,19 @@ ensure_setup() {
 install_global_claude_config() {
     local script_dir
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local claude_templates_dir="${script_dir}/../templates/.claude"
 
-    if [[ ! -d "$claude_templates_dir" ]]; then
-        echo "Warning: Claude templates directory not found at $claude_templates_dir"
+    # Check both possible template locations (development vs Homebrew)
+    local claude_templates_dir
+    if [[ -d "${LIB_DIR}/templates/.claude" ]]; then
+        # Homebrew installation
+        claude_templates_dir="${LIB_DIR}/templates/.claude"
+    elif [[ -d "${script_dir}/../templates/.claude" ]]; then
+        # Development/source installation
+        claude_templates_dir="${script_dir}/../templates/.claude"
+    else
+        echo "Warning: Claude templates directory not found"
+        echo "  Tried: ${LIB_DIR}/templates/.claude"
+        echo "  Tried: ${script_dir}/../templates/.claude"
         return 1
     fi
 
@@ -383,6 +392,8 @@ Examples:
   claw --yolo "fix it"      # Skip all permission prompts
 
 Options:
+  --version, -v             Show claw version
+  --help, -h                Show this help message
   --yolo, -y                Skip all permission prompts (DANGEROUS)
                             Passes --dangerously-skip-permissions to claude
 
@@ -398,6 +409,9 @@ GitHub issue templates:
   claw templates list           List available templates
   claw templates install <repo> Install templates to a repo
   claw templates --help         More info
+
+Issue aggregation:
+  claw issues                   Fetch issues from all repos in current project
 
 Claw adds:
   - Project-based multi-repo management (local folders)
