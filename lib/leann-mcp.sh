@@ -213,6 +213,26 @@ show_setup_complete() {
 
 # Install leann using available package manager
 install_leann() {
+    # Check for jq first (required by leann)
+    if ! command -v jq &>/dev/null; then
+        show_setup_step "running" "Installing jq (required)"
+        if command -v brew &>/dev/null; then
+            if brew install jq &>/dev/null; then
+                show_setup_step "done" "jq installed"
+            else
+                show_setup_step "error" "Failed to install jq"
+                echo ""
+                echo "${YELLOW}Please install jq manually:${NC}"
+                echo "  brew install jq"
+                echo ""
+                return 1
+            fi
+        else
+            show_setup_step "error" "jq not found (install with: brew install jq)"
+            return 1
+        fi
+    fi
+
     # Try uv first (recommended)
     if command -v uv &>/dev/null; then
         show_setup_step "running" "Installing leann via uv"
@@ -240,7 +260,34 @@ install_leann() {
         fi
     fi
 
-    show_setup_step "error" "No package manager found (need uv, pipx, or pip)"
+    # No package manager found - offer to install uv
+    show_setup_step "error" "No Python package manager found"
+    echo ""
+    echo "${YELLOW}Leann requires a Python package manager.${NC}"
+    echo ""
+    echo "Install uv (recommended):"
+    echo "  ${GRAY}brew install uv${NC}"
+    echo ""
+    echo "Or install pipx:"
+    echo "  ${GRAY}brew install pipx${NC}"
+    echo ""
+
+    # Offer to install uv if brew is available
+    if command -v brew &>/dev/null; then
+        echo -n "Install uv now? [y/N] "
+        read -r response
+        if [[ "$response" =~ ^[Yy]$ ]]; then
+            if brew install uv &>/dev/null; then
+                echo -e "${GREEN}✓${NC} uv installed"
+                # Retry leann installation
+                if uv tool install leann-core --with leann &>/dev/null; then
+                    show_setup_step "done" "Leann installed via uv"
+                    return 0
+                fi
+            fi
+        fi
+    fi
+
     return 1
 }
 
