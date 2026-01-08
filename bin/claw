@@ -9,7 +9,7 @@
 set -euo pipefail
 
 # x-release-please-start-version
-VERSION="1.3.8"
+VERSION="1.3.9"
 # x-release-please-end
 
 # ============================================================================
@@ -52,10 +52,10 @@ ensure_setup() {
         echo '{"version": "'"$VERSION"'"}' > "$CLAW_HOME/config.json"
     fi
 
-    # Install claw's global commands into Claude's config
-    # This makes /plan-day, /ship-day, etc. available everywhere
+    # Install claw's global Claude configuration
+    # This makes /plan-day, /ship-day, rules, skills, etc. available everywhere
     if [[ -d "$CLAUDE_HOME" ]] && [[ ! -f "$CLAW_HOME/.commands-installed" ]]; then
-        install_global_commands
+        install_global_claude_config
     fi
 
     # Ensure leann MCP is set up (first-run only)
@@ -63,26 +63,99 @@ ensure_setup() {
     ensure_leann_setup || true  # Don't fail claw if leann setup fails
 }
 
-install_global_commands() {
+install_global_claude_config() {
     local script_dir
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local templates_dir="${script_dir}/../templates/.claude/commands"
+    local claude_templates_dir="${script_dir}/../templates/.claude"
 
-    # Create global commands directory
-    mkdir -p "$CLAUDE_HOME/commands"
+    if [[ ! -d "$claude_templates_dir" ]]; then
+        echo "Warning: Claude templates directory not found at $claude_templates_dir"
+        return 1
+    fi
 
-    # Copy claw commands to Claude's global commands
-    if [[ -d "$templates_dir" ]]; then
-        for cmd_file in "$templates_dir"/*.md; do
-            if [[ -f "$cmd_file" ]]; then
-                local name
-                name=$(basename "$cmd_file")
-                # Only copy if doesn't exist (don't overwrite user customizations)
-                if [[ ! -f "$CLAUDE_HOME/commands/$name" ]]; then
-                    cp "$cmd_file" "$CLAUDE_HOME/commands/$name"
-                fi
+    # Install each component (only if doesn't exist to avoid overwriting user customizations)
+
+    # Commands
+    if [[ -d "$claude_templates_dir/commands" ]]; then
+        mkdir -p "$CLAUDE_HOME/commands"
+        for file in "$claude_templates_dir/commands"/*.md; do
+            [[ -f "$file" ]] || continue
+            local name=$(basename "$file")
+            [[ ! -f "$CLAUDE_HOME/commands/$name" ]] && cp "$file" "$CLAUDE_HOME/commands/$name"
+        done
+    fi
+
+    # Skills
+    if [[ -d "$claude_templates_dir/skills" ]]; then
+        mkdir -p "$CLAUDE_HOME/skills"
+        # Copy skill directories recursively
+        for skill_dir in "$claude_templates_dir/skills"/*; do
+            [[ -d "$skill_dir" ]] || continue
+            local skill_name=$(basename "$skill_dir")
+            if [[ ! -d "$CLAUDE_HOME/skills/$skill_name" ]]; then
+                cp -r "$skill_dir" "$CLAUDE_HOME/skills/$skill_name"
             fi
         done
+    fi
+
+    # Rules
+    if [[ -d "$claude_templates_dir/rules" ]]; then
+        mkdir -p "$CLAUDE_HOME/rules"
+        for file in "$claude_templates_dir/rules"/*.md; do
+            [[ -f "$file" ]] || continue
+            local name=$(basename "$file")
+            [[ ! -f "$CLAUDE_HOME/rules/$name" ]] && cp "$file" "$CLAUDE_HOME/rules/$name"
+        done
+    fi
+
+    # Agents
+    if [[ -d "$claude_templates_dir/agents" ]]; then
+        mkdir -p "$CLAUDE_HOME/agents"
+        for file in "$claude_templates_dir/agents"/*.md; do
+            [[ -f "$file" ]] || continue
+            local name=$(basename "$file")
+            [[ ! -f "$CLAUDE_HOME/agents/$name" ]] && cp "$file" "$CLAUDE_HOME/agents/$name"
+        done
+    fi
+
+    # Hooks
+    if [[ -d "$claude_templates_dir/hooks" ]]; then
+        mkdir -p "$CLAUDE_HOME/hooks"
+        for file in "$claude_templates_dir/hooks"/*.sh; do
+            [[ -f "$file" ]] || continue
+            local name=$(basename "$file")
+            if [[ ! -f "$CLAUDE_HOME/hooks/$name" ]]; then
+                cp "$file" "$CLAUDE_HOME/hooks/$name"
+                chmod +x "$CLAUDE_HOME/hooks/$name"
+            fi
+        done
+    fi
+
+    # Checklists
+    if [[ -d "$claude_templates_dir/checklists" ]]; then
+        mkdir -p "$CLAUDE_HOME/checklists"
+        for file in "$claude_templates_dir/checklists"/*.md; do
+            [[ -f "$file" ]] || continue
+            local name=$(basename "$file")
+            [[ ! -f "$CLAUDE_HOME/checklists/$name" ]] && cp "$file" "$CLAUDE_HOME/checklists/$name"
+        done
+    fi
+
+    # Presets
+    if [[ -d "$claude_templates_dir/presets" ]]; then
+        mkdir -p "$CLAUDE_HOME/presets"
+        for preset_dir in "$claude_templates_dir/presets"/*; do
+            [[ -d "$preset_dir" ]] || continue
+            local preset_name=$(basename "$preset_dir")
+            if [[ ! -d "$CLAUDE_HOME/presets/$preset_name" ]]; then
+                cp -r "$preset_dir" "$CLAUDE_HOME/presets/$preset_name"
+            fi
+        done
+    fi
+
+    # Settings (only if doesn't exist)
+    if [[ -f "$claude_templates_dir/settings.json" ]] && [[ ! -f "$CLAUDE_HOME/settings.json" ]]; then
+        cp "$claude_templates_dir/settings.json" "$CLAUDE_HOME/settings.json"
     fi
 
     # Mark as installed
@@ -266,24 +339,24 @@ GitHub issue templates:
 Claw adds:
   - Project-based multi-repo management (local folders)
   - Semantic code search via leann MCP (auto-installed on first run)
-  - Global commands: /plan-day, /ship-day, /brainstorm, etc.
+  - Global Claude configuration (commands, skills, rules, agents, hooks)
   - Aggregate issues across project repos
   - Session ID shown on exit for easy resume
   - Available in any project without setup
 
 Setup:
   claw --setup-leann            Reinstall/reconfigure leann MCP
-  claw --update                 Update global commands
+  claw --update                 Reinstall Claude configuration (skills, rules, etc.)
 
 Config: ~/.claw/
 EOF
             exit 0
             ;;
         --update)
-            # Force reinstall commands
+            # Force reinstall Claude configuration
             rm -f "$CLAW_HOME/.commands-installed"
             ensure_setup
-            echo "Commands updated."
+            echo "Claude configuration updated (commands, skills, rules, agents, etc.)."
             exit 0
             ;;
         --setup-leann)
