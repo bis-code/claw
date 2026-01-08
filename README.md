@@ -21,6 +21,7 @@ claw --continue           # Continue last session
 | **Project Management** | Group multiple repos into projects |
 | **Multi-Repo Issues** | Aggregate GitHub issues across all project repos |
 | **Daily Workflow** | `/plan-day`, `/ship-day`, `/brainstorm` commands |
+| **Autonomous Self-Improvement** | Daily automated code quality improvements with PR creation |
 | **Templates** | Install GitHub issue templates via API |
 | **Auto-Detection** | Knows which project you're in from any subdirectory |
 
@@ -59,6 +60,7 @@ claw project issues        # Fetches issues from ALL repos in project
 | `claw project list` | List all projects |
 | `claw project show` | Show current project details |
 | `claw project issues` | Fetch issues from all project repos |
+| `claw project generate-self-improve-workflow` | Generate autonomous improvement workflows |
 
 ## Daily Workflow Commands
 
@@ -86,6 +88,80 @@ claw
 /done                      # After completing an issue
 /next                      # Start next issue
 /ship-day                  # End of day
+```
+
+## Autonomous Self-Improvement
+
+Enable daily automated code quality improvements for your entire project:
+
+```bash
+# Generate workflows for all repos in your project
+cd ~/projects/my-saas/api  # Any repo in the project
+claw project generate-self-improve-workflow
+
+# Add GitHub secret to each repo
+gh secret set CLAUDE_API_KEY --repo myorg/api
+gh secret set CLAUDE_API_KEY --repo myorg/dashboard
+gh secret set CLAUDE_API_KEY --repo myorg/worker
+
+# Commit and push workflows
+# Each repo now has .github/workflows/self-improve.yml
+```
+
+### What It Does
+
+Every day at 2 AM UTC, each repo will:
+
+1. **Discover** improvement opportunities:
+   - TODOs, FIXMEs, HACKs in code
+   - Modules without tests
+   - Shellcheck warnings
+   - Complex functions (>50 lines)
+   - Code duplication
+   - **Web research** for best practices and trends
+
+2. **Prioritize** by safety, impact, and effort:
+   - Only safe changes (safety score ≥ 7)
+   - High-impact improvements first
+   - Includes trend-based features from web research
+
+3. **Implement** fixes autonomously:
+   - TDD approach (test first)
+   - Run tests after each change
+   - Rollback on failure
+   - Atomic commits per improvement
+
+4. **Create PR** automatically:
+   - Summary of all improvements
+   - Test results
+   - Web research findings
+   - Ready for review
+
+### Safety Features
+
+- Only non-breaking changes
+- All tests must pass before commit
+- Automatic rollback on failure
+- Time-limited execution (2 hours max)
+- No security-critical code modifications
+- Conservative approach to new dependencies
+
+### Example PR Output
+
+```
+🤖 Automated improvements - 2026-01-09
+
+Summary:
+- 8 improvements committed (2 from web research)
+- Test coverage: 65% → 72% (+7%)
+- Shellcheck warnings: 8 → 2 (-75%)
+- Security: Adopted 1 new best practice
+
+Web Research Findings:
+- Adopted bats-assert library for better test assertions
+- Implemented secure temp file handling (OWASP 2026)
+
+All tests passing ✓
 ```
 
 ## GitHub Issue Templates

@@ -6,9 +6,12 @@
 
 Continuously improve code quality, test coverage, and documentation without human oversight. Designed to run in CI/CD pipelines as a daily maintenance task.
 
+Additionally, enhance the project with new features by researching best practices and industry trends from the web.
+
 ## Capabilities
 
 - Discover improvement opportunities automatically
+- Research web for best practices and trends in relevant technologies
 - Prioritize by impact and safety
 - Implement fixes with TDD approach
 - Run tests to validate changes

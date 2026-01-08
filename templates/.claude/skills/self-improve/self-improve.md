@@ -21,7 +21,7 @@ Instead:
 - Rollback on any uncertainty
 - Create PR for review at the end
 
-## Phase 1: Discovery (Budget: 10 minutes)
+## Phase 1: Discovery (Budget: 15 minutes)
 
 Run discovery agents in parallel using Task tool:
 
@@ -60,19 +60,54 @@ Find functions >50 lines:
 ### Agent 5: Duplication Detector
 Find duplicated code blocks (>5 lines identical).
 
+### Agent 6: Web Research for Trends & Best Practices
+
+**IMPORTANT**: This agent runs in parallel with others using WebSearch tool.
+
+Use WebSearch to research:
+1. **Technology stack best practices** - What are current best practices for the project's tech stack?
+2. **Industry trends** - What new features/patterns are gaining traction in 2026?
+3. **Security updates** - Any new security considerations or patterns?
+4. **Performance patterns** - Modern optimization techniques relevant to the stack
+5. **Developer experience improvements** - Better tooling, workflows, or patterns
+
+**Search queries to run**:
+```
+"[tech stack] best practices 2026"
+"[tech stack] new features trends"
+"[tech stack] performance optimization"
+"[tech stack] security best practices"
+"[project domain] modern patterns 2026"
+```
+
+**Extract from results**:
+- New features to implement
+- Deprecated patterns to refactor
+- Security improvements to adopt
+- Performance optimizations to apply
+- Tool/library recommendations
+
+**Safety constraints for trend-based improvements**:
+- Only suggest non-breaking additions
+- Must be backward compatible
+- Should not introduce new dependencies without strong justification
+- Prefer incremental adoption over complete rewrites
+
 ## Phase 2: Prioritization (Budget: 5 minutes)
 
-Score each issue:
+Score each issue (including web research findings):
 
 **Safety Score** (1-10, higher = safer):
-- 10: Add test, fix shellcheck warning, update docs
+- 10: Add test, fix shellcheck warning, update docs, adopt widely-adopted pattern
+- 8: Implement best practice from web research (non-breaking)
 - 7: Extract function, add error handling
 - 5: Refactor logic, change function signature
 - 3: Update dependencies, modify API
 - 1: Change auth/crypto, breaking changes
 
 **Impact Score** (1-10, higher = more impact):
-- 10: Fix critical bug, add test coverage to untested module
+- 10: Fix critical bug, add test coverage to untested module, adopt security best practice
+- 8: Implement trending feature/pattern that improves UX or performance
 - 7: Improve error handling, reduce complexity
 - 5: Update documentation, fix shellcheck warning
 - 3: Extract helper function, remove duplication
@@ -80,18 +115,25 @@ Score each issue:
 
 **Effort Score** (1-10, lower = less effort):
 - 1: Fix typo, update comment
-- 3: Add missing test, fix shellcheck warning
-- 5: Extract function, add error handling
+- 3: Add missing test, fix shellcheck warning, adopt simple best practice
+- 5: Extract function, add error handling, implement small trend-based feature
 - 7: Refactor complex logic, update docs
 - 10: Major refactor, dependency update
 
-**Final Priority**: `safety * impact / effort`
+**Trend Bonus**: If improvement is based on web research and:
+- Addresses known security vulnerability → +2 impact
+- Improves performance significantly → +1 impact
+- Enhances developer experience → +0.5 impact
+- Widely adopted (3+ major projects) → safety = max(safety, 8)
+
+**Final Priority**: `(safety + trend_safety_bonus) * (impact + trend_impact_bonus) / effort`
 
 **Filtering Rules**:
 1. Only select issues with safety >= 7
 2. Exclude if effort > 7 (too risky for autonomous execution)
-3. Sort by priority score descending
-4. Select top N that fit in time budget
+3. Exception: Trend-based improvements with safety=10 and effort<=8 allowed
+4. Sort by priority score descending
+5. Select top N that fit in time budget
 
 ## Phase 3: Execution (Budget: Remaining time)
 
@@ -235,21 +277,28 @@ Phase 1: Discovery
   ✓ Found 4 modules without tests
   ✓ Found 8 shellcheck warnings
   ✓ Found 6 functions >50 lines
+  ✓ Web research completed:
+    - Found 3 Bash best practices from 2026
+    - Identified 2 security improvements
+    - Discovered new testing pattern (bats-assert library)
 
 Phase 2: Prioritization
-  → Selected 8 improvements (safety>=7, effort<=5)
+  → Selected 10 improvements (safety>=7, effort<=5)
+  → Includes 2 trend-based improvements
   → Estimated time: 1.5 hours
 
 Phase 3: Execution
-  1/8 ✓ Add tests for orchestrator.sh [15 min]
-  2/8 ✓ Fix shellcheck warnings in projects.sh [5 min]
-  3/8 ✓ Extract function from get_agent_prompt [12 min]
-  4/8 ✓ Add error handling to cd commands [8 min]
-  5/8 ✗ Refactor auto_loop (rollback - tests failed) [10 min]
-  6/8 ✓ Add input validation to templates.sh [7 min]
-  7/8 ✓ Update documentation for new features [6 min]
+  1/10 ✓ Add tests for orchestrator.sh [15 min]
+  2/10 ✓ Fix shellcheck warnings in projects.sh [5 min]
+  3/10 ✓ Extract function from get_agent_prompt [12 min]
+  4/10 ✓ Add error handling to cd commands [8 min]
+  5/10 ✗ Refactor auto_loop (rollback - tests failed) [10 min]
+  6/10 ✓ Add input validation to templates.sh [7 min]
+  7/10 ✓ Update documentation for new features [6 min]
+  8/10 ✓ Adopt bats-assert for better test assertions [9 min] (web research)
+  9/10 ✓ Implement secure temp file handling pattern [8 min] (web research)
 
-  Time budget exhausted (1h 3min remaining)
+  Time budget exhausted (50min remaining)
 
 Phase 4: Ship
   ✓ Created PR #123
@@ -257,11 +306,12 @@ Phase 4: Ship
   ✓ Ready for review
 
 Summary:
-- 6 improvements committed
+- 8 improvements committed (2 from web research)
 - 1 rollback (failed tests)
 - 2 skipped (time budget)
 - Test coverage: 65% → 72% (+7%)
 - Shellcheck warnings: 8 → 2 (-75%)
+- Security: Adopted 1 new best practice
 ```
 
 ## Integration with CI/CD
@@ -303,13 +353,32 @@ If skill encounters fatal errors:
 Create `self-improve-report.md`:
 
 ```markdown
-# Self-Improvement Report - 2024-01-09
+# Self-Improvement Report - 2026-01-09
 
 ## Summary
 - Duration: 1h 45m
-- Improvements: 6 committed, 1 rollback, 2 skipped
+- Improvements: 8 committed (2 from web research), 1 rollback, 2 skipped
 - Test coverage: +7%
 - Shellcheck warnings: -75%
+- Security: Adopted 1 new best practice
+
+## Web Research Findings
+
+### Best Practices Adopted
+1. **Bats-assert library** - Modern assertion library for Bash tests
+   - Source: [Bats-assert GitHub](https://github.com/bats-core/bats-assert)
+   - Impact: Better test readability and debugging
+   - Implemented in: abc123f
+
+2. **Secure temp file handling** - mktemp with automatic cleanup
+   - Source: OWASP Bash Security 2026
+   - Impact: Prevents temp file race conditions
+   - Implemented in: def456g
+
+### Trends Identified (Not Yet Implemented)
+- Shellcheck v0.10 new rules (requires dependency update)
+- GitHub Actions reusable workflows (deferred to next run)
+- Container-based testing with Docker (effort=9, needs planning)
 
 ## Changes Made
 
@@ -322,6 +391,18 @@ Create `self-improve-report.md`:
 - Fixed SC2086: Quote to prevent word splitting
 - Fixed SC2155: Declare and assign separately
 - Commit: def456a
+
+### 8. Adopt bats-assert for better test assertions (Web Research)
+- Installed bats-assert library
+- Migrated 20 test assertions to use assert_output/assert_success
+- Source: Industry best practice 2026
+- Commit: hij789k
+
+### 9. Implement secure temp file handling pattern (Web Research)
+- Added mktemp usage in 3 functions
+- Implemented trap-based cleanup
+- Source: OWASP Bash Security Guidelines
+- Commit: lmn012p
 
 [... more changes ...]
 
@@ -336,11 +417,18 @@ Create `self-improve-report.md`:
 - Reason: Time budget exhausted
 - Action: Deferred to next run
 
+### 3. Shellcheck v0.10 upgrade
+- Reason: Requires dependency update (effort=8)
+- Action: Create issue for human review
+- Source: Web research - new security checks available
+
 ## Next Run Priorities
 
-1. Complete dependency updates
+1. Complete dependency updates (including shellcheck v0.10)
 2. Add tests for wrapper.sh
 3. Extract functions from handle_templates_command
+4. Explore GitHub Actions reusable workflows
+5. Investigate container-based testing approach
 ```
 
 ## Completion Signal

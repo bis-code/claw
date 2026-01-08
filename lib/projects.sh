@@ -440,6 +440,135 @@ fetch_project_issues() {
 }
 
 # ============================================================================
+# Workflow Generation
+# ============================================================================
+
+# Generate workflow for a repo
+# Usage: generate_workflow_for_repo <repo_path> <workflow_type>
+generate_workflow_for_repo() {
+    local repo_path="$1"
+    local workflow_type="${2:-self-improve}"
+
+    if [[ ! -d "$repo_path" ]]; then
+        echo "Error: Repo not found: $repo_path"
+        return 1
+    fi
+
+    if [[ ! -d "$repo_path/.git" ]]; then
+        echo "Error: Not a git repo: $repo_path"
+        return 1
+    fi
+
+    # Create .github/workflows directory
+    mkdir -p "$repo_path/.github/workflows"
+
+    local workflow_file="$repo_path/.github/workflows/${workflow_type}.yml"
+
+    # Check if workflow already exists
+    if [[ -f "$workflow_file" ]]; then
+        echo "  Workflow already exists: $workflow_file"
+        return 0
+    fi
+
+    # Copy workflow template from claw templates
+    local template_file=""
+
+    # Try to find template in Homebrew or source installation
+    if [[ -d "${LIB_DIR}/templates/.github/workflows" ]]; then
+        template_file="${LIB_DIR}/templates/.github/workflows/${workflow_type}.yml"
+    elif [[ -d "${SCRIPT_DIR}/../templates/.github/workflows" ]]; then
+        template_file="${SCRIPT_DIR}/../templates/.github/workflows/${workflow_type}.yml"
+    fi
+
+    if [[ ! -f "$template_file" ]]; then
+        echo "Error: Workflow template not found: ${workflow_type}.yml"
+        return 1
+    fi
+
+    # Copy template
+    cp "$template_file" "$workflow_file"
+
+    echo "  ✓ Generated: $workflow_file"
+    return 0
+}
+
+# Generate self-improve workflow for all repos in project
+# Usage: project_generate_self_improve_workflow [--repo <path>]
+project_generate_self_improve_workflow() {
+    local workflow_type="self-improve"
+    local specific_repo=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --repo|-r)
+                specific_repo="$2"
+                shift 2
+                ;;
+            *)
+                shift
+                ;;
+        esac
+    done
+
+    local project_name
+    project_name=$(get_current_project)
+
+    if [[ -z "$project_name" ]]; then
+        echo "Not in a project. Run from a project repo or use 'claw project show'"
+        return 1
+    fi
+
+    echo "Generating autonomous self-improvement workflow for project: $project_name"
+    echo ""
+
+    local generated_count=0
+    local skipped_count=0
+
+    if [[ -n "$specific_repo" ]]; then
+        # Generate for specific repo
+        if generate_workflow_for_repo "$specific_repo" "$workflow_type"; then
+            generated_count=$((generated_count + 1))
+        else
+            skipped_count=$((skipped_count + 1))
+        fi
+    else
+        # Generate for all repos in project
+        while IFS= read -r repo_path; do
+            [[ -z "$repo_path" ]] && continue
+
+            local repo_name
+            repo_name=$(basename "$repo_path")
+
+            echo "Processing: $repo_name"
+
+            if generate_workflow_for_repo "$repo_path" "$workflow_type"; then
+                generated_count=$((generated_count + 1))
+            else
+                skipped_count=$((skipped_count + 1))
+            fi
+        done < <(get_project_repos "$project_name")
+    fi
+
+    echo ""
+    echo "Summary:"
+    echo "  ✓ Generated: $generated_count self-improvement workflows"
+    [[ $skipped_count -gt 0 ]] && echo "  - Skipped: $skipped_count (already exist or errors)"
+    echo ""
+    echo "What happens next:"
+    echo "  - Each repo will run daily self-improvement at 2 AM UTC"
+    echo "  - Discovers TODOs, test gaps, shellcheck warnings, best practices"
+    echo "  - Researches web for trends and improvements"
+    echo "  - Implements fixes autonomously with TDD"
+    echo "  - Creates PR automatically when done"
+    echo ""
+    echo "Setup required:"
+    echo "  1. Review generated workflows in each repo"
+    echo "  2. Add CLAUDE_API_KEY secret to each GitHub repo:"
+    echo "     gh secret set CLAUDE_API_KEY --repo <owner/repo>"
+    echo "  3. Commit and push the workflows"
+}
+
+# ============================================================================
 # Command Handler
 # ============================================================================
 
@@ -531,21 +660,28 @@ handle_project_command() {
                     ) | join("\n"))' 2>/dev/null
             fi
             ;;
+        generate-workflow|generate-self-improve-workflow)
+            project_generate_self_improve_workflow "$@"
+            ;;
         ""|--help|-h)
             cat << 'EOF'
 claw project - Multi-repo project management
 
 Usage:
-  claw project create <name>        Create a new project
-  claw project add-repo <path>      Add local repo to current/specified project
-  claw project remove-repo <path>   Remove repo from project
-  claw project list                 List all projects
-  claw project show [name]          Show project details
-  claw project issues [--json]      Fetch issues from all project repos
+  claw project create <name>                      Create a new project
+  claw project add-repo <path>                    Add local repo to current/specified project
+  claw project remove-repo <path>                 Remove repo from project
+  claw project list                               List all projects
+  claw project show [name]                        Show project details
+  claw project issues [--json]                    Fetch issues from all project repos
+  claw project generate-self-improve-workflow     Generate autonomous improvement workflows
 
 Options for add-repo:
   --project, -p <name>    Specify project (auto-detects from cwd)
   --name, -n <name>       Override repo name (default: folder name)
+
+Options for generate-self-improve-workflow:
+  --repo, -r <path>       Generate for specific repo only (default: all repos)
 
 Examples:
   # Create a project
@@ -558,7 +694,13 @@ Examples:
   cd ~/projects/my-game/frontend
   claw project add-repo .
 
-  # Now from any repo in the project, issues aggregate
+  # Generate autonomous self-improvement workflows for all repos
+  claw project generate-self-improve-workflow
+
+  # Generate for specific repo only
+  claw project generate-self-improve-workflow --repo ~/projects/my-game/backend
+
+  # Fetch issues from all project repos
   cd ~/projects/my-game/backend
   claw project issues --label claude-ready
 
@@ -567,7 +709,17 @@ How it works:
   - A marker file (.claw/project.json) is added to each repo
   - When you run claw from any project repo, it auto-detects the project
   - Issues are fetched from ALL GitHub repos in the project
+  - Workflows enable daily autonomous improvements across all repos
   - This enables cross-repo planning with /plan-day and /brainstorm
+
+About autonomous self-improvement:
+  - Runs daily at 2 AM UTC via GitHub Actions
+  - Discovers TODOs, test gaps, shellcheck warnings
+  - Researches web for best practices and trends
+  - Implements fixes with TDD approach
+  - Creates PR automatically with all improvements
+  - No human interaction required during execution
+  - Requires CLAUDE_API_KEY secret in each GitHub repo
 EOF
             ;;
         *)
