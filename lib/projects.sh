@@ -772,7 +772,15 @@ About autonomous self-improvement:
   - Implements fixes with TDD approach
   - Creates PR automatically with all improvements
   - No human interaction required during execution
-  - Requires CLAUDE_API_KEY secret in each GitHub repo
+  - Uses OAuth authentication (setup via /install-github-app)
+  - No per-repo API keys needed
+
+Prerequisites:
+  Before using this command, run:
+    claude
+    /install-github-app
+
+  This sets up CLAUDE_CODE_OAUTH_TOKEN for your repos/org.
 EOF
             ;;
         *)
