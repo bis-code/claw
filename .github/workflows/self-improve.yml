@@ -1,0 +1,197 @@
+name: Daily Self-Improvement
+
+on:
+  schedule:
+    # Run at 2 AM UTC daily
+    - cron: '0 2 * * *'
+
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      hours:
+        description: 'Time budget in hours'
+        required: false
+        default: '2'
+        type: string
+      focus:
+        description: 'Focus area (optional)'
+        required: false
+        type: string
+      dry_run:
+        description: 'Dry run (report only)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  self-improve:
+    runs-on: ubuntu-latest
+
+    # Limit runtime to prevent runaway execution
+    timeout-minutes: 150
+
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better analysis
+
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Install dependencies
+        run: |
+          # Install claw
+          brew tap bis-code/tap
+          brew install claw
+
+          # Install required tools
+          brew install jq shellcheck bats-core
+
+          # Verify installations
+          claw --version
+          shellcheck --version
+          bats --version
+
+      - name: Configure Git
+        run: |
+          git config user.name "Claude Code Bot"
+          git config user.email "claude-code-bot@users.noreply.github.com"
+
+      - name: Run self-improvement
+        id: improve
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          HOURS: ${{ inputs.hours || '2' }}
+          FOCUS: ${{ inputs.focus || '' }}
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+        run: |
+          # Build claw command
+          cmd="claw /self-improve --hours $HOURS"
+
+          if [ -n "$FOCUS" ]; then
+            cmd="$cmd --focus \"$FOCUS\""
+          fi
+
+          if [ "$DRY_RUN" = "true" ]; then
+            cmd="$cmd --dry-run"
+          fi
+
+          # Run self-improvement
+          echo "Running: $cmd"
+          eval $cmd
+
+          # Capture exit code
+          exit_code=$?
+
+          # Set outputs
+          echo "exit_code=$exit_code" >> $GITHUB_OUTPUT
+
+          # Check if PR was created
+          if [ -f .self-improve-pr-number ]; then
+            pr_number=$(cat .self-improve-pr-number)
+            echo "pr_number=$pr_number" >> $GITHUB_OUTPUT
+          fi
+
+          exit $exit_code
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: self-improve-report
+          path: |
+            self-improve-report.md
+            improvements-skipped.md
+            self-improve-errors.log
+          retention-days: 30
+
+      - name: Comment on PR
+        if: steps.improve.outputs.pr_number != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const prNumber = ${{ steps.improve.outputs.pr_number }};
+
+            // Read report
+            let report = 'Self-improvement completed!';
+            if (fs.existsSync('self-improve-report.md')) {
+              report = fs.readFileSync('self-improve-report.md', 'utf8');
+            }
+
+            // Comment on PR
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: `## 🤖 Self-Improvement Report\n\n${report}`
+            });
+
+      - name: Create issue on failure
+        if: failure() && steps.improve.outputs.exit_code != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Read error log
+            let errors = 'No error log found';
+            if (fs.existsSync('self-improve-errors.log')) {
+              errors = fs.readFileSync('self-improve-errors.log', 'utf8');
+            }
+
+            // Create issue
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Self-improvement failed - ${new Date().toISOString().split('T')[0]}`,
+              body: `## Self-Improvement Failure\n\n**Run**: ${context.runId}\n**Workflow**: ${context.workflow}\n\n### Errors\n\n\`\`\`\n${errors}\n\`\`\`\n\n### Actions\n\n1. Review error log\n2. Fix underlying issue\n3. Re-run workflow\n\n---\n🤖 Auto-created by self-improve workflow`,
+              labels: ['self-improve-failure', 'bug', 'automated']
+            });
+
+      - name: Notify on success
+        if: success() && steps.improve.outputs.pr_number != ''
+        run: |
+          echo "✓ Self-improvement completed successfully"
+          echo "✓ PR created: #${{ steps.improve.outputs.pr_number }}"
+          echo "✓ Review at: ${{ github.server_url }}/${{ github.repository }}/pull/${{ steps.improve.outputs.pr_number }}"
+
+  # Optional: Run tests on created PR
+  test-improvements:
+    needs: self-improve
+    if: needs.self-improve.outputs.pr_number != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ needs.self-improve.outputs.pr_number }}/head
+
+      - name: Run tests
+        run: |
+          # Install dependencies
+          brew install bats-core
+
+          # Run all tests
+          ./tests/bats/bin/bats tests/*.bats
+          ./test/homebrew-integration.sh --local
+
+      - name: Approve PR if tests pass
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.pulls.createReview({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: ${{ needs.self-improve.outputs.pr_number }},
+              event: 'APPROVE',
+              body: '✓ All tests passed. Auto-approved by CI.'
+            });
