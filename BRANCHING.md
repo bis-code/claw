@@ -152,6 +152,50 @@ Release-please automatically determines version bumps:
 
 ---
 
+## Testing Before Release (Optional)
+
+Before creating an official release, you can test the Homebrew installation using a release candidate (RC):
+
+### Create RC for Testing
+1. Go to: **Actions** → **Staging Release (Test Homebrew)** → **Run workflow**
+2. Enter RC version (e.g., `1.4.2-rc1`)
+3. Workflow creates:
+   - RC tag on `develop` branch
+   - Pre-release on GitHub
+   - Tarball with SHA256
+
+### Test the RC
+```bash
+# Install RC version
+brew uninstall claw 2>/dev/null || true
+brew install https://github.com/bis-code/claw/releases/download/v1.4.2-rc1/claw-1.4.2-rc1.tar.gz
+
+# Test functionality
+claw --version
+claw --help
+# ... test your features ...
+
+# Uninstall RC
+brew uninstall claw
+```
+
+### After Testing
+If tests pass:
+```bash
+# Clean up RC
+gh release delete v1.4.2-rc1 --yes
+git push origin :v1.4.2-rc1
+
+# Proceed with official release (Steps 1-6 above)
+```
+
+If tests fail:
+- Fix issues on `develop`
+- Create new RC (e.g., `1.4.2-rc2`)
+- Test again
+
+---
+
 ## Example Timeline
 
 **Monday - Thursday: Development**
