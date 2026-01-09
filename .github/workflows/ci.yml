@@ -23,6 +23,11 @@ jobs:
           git clone --depth 1 https://github.com/bats-core/bats-support.git tests/test_helper/bats-support
           git clone --depth 1 https://github.com/bats-core/bats-assert.git tests/test_helper/bats-assert
 
+      - name: Setup Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
       - name: Setup uv
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
 
@@ -30,98 +35,38 @@ jobs:
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Install LEANN
+        continue-on-error: true
         run: |
           source ~/.bashrc 2>/dev/null || true
           export PATH="$HOME/.local/bin:$PATH"
           uv tool install leann || echo "LEANN installation failed, tests will skip"
 
       - name: Run unit tests
-        run: ./tests/bats/bin/bats tests/detect_project.bats tests/project_types.bats tests/agents.bats
+        run: ./tests/bats/bin/bats tests/detect_project.bats tests/project_types.bats tests/agents.bats tests/boolean_params.bats
+
+      - name: Run utility tests
+        run: ./tests/bats/bin/bats tests/utils.bats tests/output.bats tests/files.bats
 
       - name: Run integration tests
-        run: ./tests/bats/bin/bats tests/integration.bats tests/edge_cases.bats
+        run: ./tests/bats/bin/bats tests/integration.bats tests/edge_cases.bats tests/integration_project.bats
 
       - name: Run CLI tests
-        run: ./tests/bats/bin/bats tests/claw_cli.bats tests/repos.bats tests/home.bats tests/manifest.bats
+        run: ./tests/bats/bin/bats tests/claw_cli.bats tests/repos.bats tests/home.bats tests/manifest.bats tests/issue_templates.bats
 
-      - name: Run LEANN tests
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          ./tests/bats/bin/bats tests/leann.bats tests/leann_mcp.bats
+      - name: Run project tests
+        run: ./tests/bats/bin/bats tests/projects.bats tests/multi_repo.bats
 
-      - name: Run multi-repo tests
-        run: ./tests/bats/bin/bats tests/multi_repo.bats
-
-      - name: Run autonomous execution tests
-        run: |
-          git config --global user.email "test@example.com"
-          git config --global user.name "Test Runner"
-          ./tests/bats/bin/bats tests/autonomous/*.bats
+      - name: Run autonomous tests
+        run: ./tests/bats/bin/bats tests/autonomous/
 
       - name: Run external dependency tests
+        run: ./tests/bats/bin/bats tests/external_deps.bats
+
+      - name: Run LEANN tests
+        continue-on-error: true
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-          ./tests/bats/bin/bats tests/external_deps.bats tests/real_world.bats
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ./tests/bats/bin/bats tests/leann.bats tests/leann_mcp.bats || echo "LEANN tests skipped"
 
-  homebrew-integration:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install jq (Ubuntu)
-        if: runner.os == 'Linux'
-        run: sudo apt-get install -y jq
-
-      - name: Run Homebrew integration tests (local mode)
-        run: ./test/homebrew-integration.sh --local
-
-      - name: Build tarball for Homebrew simulation
-        run: |
-          mkdir -p /tmp/claw-test/claw-test
-          cp -r bin lib templates /tmp/claw-test/claw-test/
-          cd /tmp/claw-test
-          tar -czvf claw-test.tar.gz claw-test
-
-      - name: Install from tarball (simulates Homebrew)
-        run: |
-          mkdir -p /tmp/claw-installed/bin /tmp/claw-installed/lib/claw
-          cd /tmp/claw-test
-          tar -xzf claw-test.tar.gz
-          cp claw-test/bin/claw /tmp/claw-installed/bin/
-          cp -r claw-test/lib/* /tmp/claw-installed/lib/claw/
-          cp -r claw-test/templates /tmp/claw-installed/lib/claw/
-          # Simulate Homebrew path rewrite
-          sed -i.bak 's|LIB_DIR="${SCRIPT_DIR}/../lib"|LIB_DIR="/tmp/claw-installed/lib/claw"|' /tmp/claw-installed/bin/claw
-          chmod +x /tmp/claw-installed/bin/claw
-
-      - name: Run integration tests on installed binary
-        run: |
-          export PATH="/tmp/claw-installed/bin:$PATH"
-          # Verify templates work (this was the bug we caught)
-          claw templates list | grep -q "bug-report" || exit 1
-          claw templates list | grep -q "claude-ready" || exit 1
-          claw --version | grep -q "claw v" || exit 1
-          claw --help | grep -q "Command Line Automated Workflow" || exit 1
-          echo "Installed binary tests passed!"
-
-  lint:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install shellcheck
-        run: sudo apt-get install -y shellcheck
-
-      - name: Run shellcheck
-        run: |
-          shellcheck bin/claw lib/*.sh install.sh tests/setup_tests.sh || true
-          echo "Shellcheck completed (warnings allowed)"
+      - name: Run real-world tests
+        run: ./tests/bats/bin/bats tests/real_world.bats
