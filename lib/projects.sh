@@ -674,7 +674,7 @@ handle_project_command() {
             local issues
             issues=$(fetch_project_issues "${args[@]}")
 
-            if [[ "$json_output" == "true" ]]; then
+            if $json_output; then
                 echo "$issues"
             else
                 local count

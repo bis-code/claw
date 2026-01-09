@@ -365,7 +365,7 @@ import_from_github() {
     local count=0
 
     # Multi-repo mode: fetch from all tracked repos via claw
-    if [[ "$all_repos" == "true" ]]; then
+    if $all_repos; then
         # Try to use claw issues command if available
         local issues
         local claw_args=("--json")
