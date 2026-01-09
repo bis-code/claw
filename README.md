@@ -293,6 +293,38 @@ claw --update             # Update global commands
 3. **Skills**: Global commands installed to `~/.claude/commands/`
 4. **Templates**: Installed via GitHub API (no repo cloning)
 
+## Development
+
+### Quick Local Testing
+
+For instant feedback during development:
+
+```bash
+# Enable dev mode (one time)
+make dev
+
+# Now make changes and test instantly!
+vim bin/claw
+claw --version  # ⚡ Instant!
+
+# Quick test
+make test
+
+# When done (optional - or just leave dev mode on)
+make install  # Returns to normal installation
+```
+
+**Commands:**
+- `make dev` - Enable dev mode (symlinks to working code)
+- `make test` - Quick functionality test
+- `make test-full` - Run full test suite
+- `make install` - Install claw normally (disables dev mode)
+- `make clean` - Remove all installations
+
+**Documentation:**
+- [LOCAL-TESTING.md](LOCAL-TESTING.md) - All testing methods
+- [BRANCHING.md](BRANCHING.md) - Release workflow
+
 ## License
 
 MIT

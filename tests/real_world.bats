@@ -51,7 +51,7 @@ teardown() {
 @test "claw: --update works" {
     run "$PROJECT_ROOT/bin/claw" --update
     assert_success
-    assert_output --partial "Commands updated"
+    assert_output --partial "Claude configuration updated"
 }
 
 # ============================================================================

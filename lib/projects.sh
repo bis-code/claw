@@ -9,6 +9,10 @@ set -euo pipefail
 CLAW_HOME="${CLAW_HOME:-$HOME/.claw}"
 PROJECTS_DIR="$CLAW_HOME/projects"
 
+# Get script directory for sourcing other libraries
+LIB_DIR_PROJECTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${LIB_DIR_PROJECTS}/utils.sh"
+
 # ============================================================================
 # Git Utilities
 # ============================================================================
@@ -23,24 +27,7 @@ get_current_repo() {
     local remote_url
     remote_url=$(git remote get-url origin 2>/dev/null) || return 0
 
-    # Extract owner/repo from various URL formats
-    # https://github.com/owner/repo.git
-    # git@github.com:owner/repo.git
-    # https://github.com/owner/repo
-    local repo=""
-
-    # Handle HTTPS URLs
-    if [[ "$remote_url" =~ github\.com/([^/]+)/([^/]+) ]]; then
-        repo="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
-    # Handle SSH URLs
-    elif [[ "$remote_url" =~ github\.com:([^/]+)/([^/]+) ]]; then
-        repo="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
-    fi
-
-    # Remove .git suffix if present
-    repo="${repo%.git}"
-
-    echo "$repo"
+    parse_github_repo "$remote_url"
 }
 
 # ============================================================================
@@ -169,7 +156,9 @@ project_add_repo() {
     fi
 
     # Try to get GitHub remote
-    github_repo=$(cd "$repo_path" && git remote get-url origin 2>/dev/null | sed 's/.*github.com[:/]\(.*\)\.git/\1/' || echo "")
+    local remote_url
+    remote_url=$(cd "$repo_path" && git remote get-url origin 2>/dev/null) || remote_url=""
+    github_repo=$(parse_github_repo "$remote_url")
 
     local config_file
     config_file=$(get_project_config "$project_name")
@@ -685,7 +674,7 @@ handle_project_command() {
             local issues
             issues=$(fetch_project_issues "${args[@]}")
 
-            if [[ "$json_output" == "true" ]]; then
+            if $json_output; then
                 echo "$issues"
             else
                 local count

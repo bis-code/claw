@@ -9,6 +9,10 @@ set -euo pipefail
 QUEUE_FILE=".claude/queue.json"
 LOG_FILE=".claude/autonomous.log"
 
+# Get script directory for sourcing other libraries
+LIB_DIR_EXECUTOR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${LIB_DIR_EXECUTOR}/utils.sh"
+
 # ============================================================================
 # Logging
 # ============================================================================
@@ -361,7 +365,7 @@ import_from_github() {
     local count=0
 
     # Multi-repo mode: fetch from all tracked repos via claw
-    if [[ "$all_repos" == "true" ]]; then
+    if $all_repos; then
         # Try to use claw issues command if available
         local issues
         local claw_args=("--json")
@@ -373,8 +377,10 @@ import_from_github() {
             issues=$(claw issues "${claw_args[@]}" 2>/dev/null) || issues="[]"
         else
             # Fallback: just fetch from current repo
+            local remote_url
+            remote_url=$(git remote get-url origin 2>/dev/null) || remote_url=""
             local current_repo
-            current_repo=$(git remote get-url origin 2>/dev/null | sed 's/.*github.com[:/]\(.*\)\.git/\1/' || echo "")
+            current_repo=$(parse_github_repo "$remote_url")
             if [[ -n "$current_repo" ]]; then
                 local gh_args=("issue" "list" "--repo" "$current_repo" "--json" "number,title,labels,body,repository" "--state" "$state")
                 [[ -n "$label" ]] && gh_args+=("--label" "$label")
