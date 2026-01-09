@@ -2,6 +2,30 @@
 
 Quick methods to test claw locally without releases.
 
+## Quick Start (Makefile) ⭐
+
+The easiest way to test locally:
+
+```bash
+make dev        # Enable dev mode
+vim bin/claw    # Make changes
+claw --version  # Test instantly!
+make test       # Quick validation
+make dev-off    # Clean up
+```
+
+**All make commands:**
+- `make dev` - Enable dev mode
+- `make dev-off` - Disable dev mode
+- `make dev-status` - Check status
+- `make test` - Quick test
+- `make test-full` - Run all tests
+- `make install` - Install normally
+- `make clean` - Remove all
+- `make help` - Show help
+
+---
+
 ## Method 1: Direct Installation from Local Directory (Fastest) ⚡
 
 Test the exact code you're working on:

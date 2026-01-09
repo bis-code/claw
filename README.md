@@ -301,25 +301,28 @@ For instant feedback during development:
 
 ```bash
 # Enable dev mode (one time)
-./dev-mode.sh on
+make dev
 
 # Now make changes and test instantly!
 vim bin/claw
 claw --version  # ⚡ Instant!
 
 # Quick test
-./dev-mode.sh test
+make test
 
 # When done
-./dev-mode.sh off
+make dev-off
 ```
 
 **Commands:**
-- `./dev-mode.sh on` - Enable development mode (symlinks to working code)
-- `./dev-mode.sh off` - Disable development mode
-- `./dev-mode.sh status` - Check current mode
-- `./dev-mode.sh test` - Quick functionality test
-- `./dev-mode.sh full` - Run full test suite
+- `make dev` - Enable development mode (symlinks to working code)
+- `make dev-off` - Disable development mode
+- `make dev-status` - Check current mode
+- `make test` - Quick functionality test
+- `make test-full` - Run full test suite
+- `make install` - Install claw (production)
+- `make clean` - Remove all installations
+- `make help` - Show all commands
 
 **Documentation:**
 - [LOCAL-TESTING.md](LOCAL-TESTING.md) - All testing methods
