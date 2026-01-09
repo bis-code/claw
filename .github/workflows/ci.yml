@@ -17,6 +17,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Configure git for tests
+        run: |
+          git config --global user.email "ci@github.com"
+          git config --global user.name "GitHub Actions"
+
       - name: Setup BATS
         run: |
           git clone --depth 1 https://github.com/bats-core/bats-core.git tests/bats
