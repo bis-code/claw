@@ -62,18 +62,42 @@ claw project issues        # Fetches issues from ALL repos in project
 | `claw project issues` | Fetch issues from all project repos |
 | `claw project generate-self-improve-workflow` | Generate autonomous improvement workflows |
 
-## Daily Workflow Commands
+## Available Skills/Commands
 
-These commands are available in every Claude session:
+All commands are available inside any Claude session started with `claw`. Use them with a `/` prefix.
 
-| Command | Purpose |
-|---------|---------|
-| `/plan-day --hours 4` | Plan today's work from GitHub issues |
-| `/brainstorm` | Multi-agent analysis of issues |
-| `/auto-pilot` | Full autonomous: discover, plan, execute, ship |
-| `/ship-day` | End of day: create PR, close issues |
-| `/next` | Pick up next issue from plan |
-| `/done` | Mark current issue complete |
+### Daily Workflow
+
+| Command | Flags | Description |
+|---------|-------|-------------|
+| `/plan-day` | `--hours N` (required)<br>`--brainstorm`<br>`--no-issues` | Plan the day's work from GitHub issues<br>Uses lens-based analysis (Value, Risk, Effort, Security) |
+| `/next` | None | Pick up next issue from today's plan |
+| `/done` | None | Mark current issue as complete, update status |
+| `/ship-day` | None | End of day: squash commits, create PR, close issues |
+
+### Autonomous Workflows
+
+| Command | Flags | Description |
+|---------|-------|-------------|
+| `/auto-pilot` | `--hours N` (default: 4)<br>`--focus "area"`<br>`--discovery [deep\|shallow\|none]`<br>`--discover-only` | Full autonomous mode: discover work, plan, execute, ship<br>Runs entire development cycle without human interaction |
+| `/self-improve` | `--hours N` (default: 2)<br>`--focus "area"`<br>`--dry-run`<br>`--max-commits N` (default: 20) | Autonomous code quality improvements<br>Discovers issues, researches best practices, creates PR |
+| `/autonomous` | None | Execute tasks from queue with TDD and blocker handling |
+
+### Analysis & Planning
+
+| Command | Flags | Description |
+|---------|-------|-------------|
+| `/brainstorm` | None | Multi-agent collaborative planning with parallel analysis<br>Includes CTO, Senior Dev, UX, QA, Product Owner perspectives |
+| `/pivot` | None | Handle mid-day changes: blocker, better idea, scope change<br>Documents reason and updates plan |
+
+### Utilities
+
+| Command | Flags | Description |
+|---------|-------|-------------|
+| `/search` | `<query>`<br>`--files`<br>`--def`<br>`--content` | Efficient codebase search (optimized for token usage) |
+| `/index` | `--update` | Generate or update project index for faster searching |
+| `/summary` | None | Generate daily work summary with commits and changes |
+| `/benchmark-search` | None | Compare search efficiency (Glob/Grep vs /search) |
 
 ### Example Workflow
 
@@ -88,6 +112,18 @@ claw
 /done                      # After completing an issue
 /next                      # Start next issue
 /ship-day                  # End of day
+```
+
+### Autonomous Mode Example
+
+```bash
+claw
+
+# Let Claude discover and fix issues autonomously
+/auto-pilot --hours 4
+
+# Or just improve code quality
+/self-improve --hours 2
 ```
 
 ## Autonomous Self-Improvement

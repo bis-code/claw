@@ -8,6 +8,13 @@ Search the codebase efficiently with minimal token usage.
 - `/search --def <name>` - Find function/class definitions
 - `/search --content <pattern>` - Find content in files
 
+## Options
+
+- `<query>` - General search query (files, functions, classes)
+- `--files <pattern>` - Search for files matching pattern
+- `--def <name>` - Search for function/class definitions
+- `--content <pattern>` - Search file contents
+
 ## Instructions
 
 Use the search skill for implementation details.

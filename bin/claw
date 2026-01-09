@@ -413,6 +413,26 @@ GitHub issue templates:
 Issue aggregation:
   claw issues                   Fetch issues from all repos in current project
 
+Available Skills (use inside Claude session with /):
+  Daily Workflow:
+    /plan-day --hours N         Plan the day using lens-based analysis
+    /next                       Pick up next issue from plan
+    /done                       Mark current issue complete
+    /ship-day                   End of day: create PR, close issues
+
+  Autonomous:
+    /auto-pilot --hours N       Full autonomous mode (discover, plan, execute, ship)
+    /self-improve --hours N     Autonomous code quality improvements
+    /autonomous                 Execute tasks from queue with TDD
+
+  Analysis:
+    /brainstorm                 Multi-agent collaborative planning
+    /search <query>             Efficient codebase search
+    /index [--update]           Generate/update project index
+
+  Run 'claw' to start, then use any skill with /command-name
+  Full docs: README.md or inside Claude with /help
+
 Claw adds:
   - Project-based multi-repo management (local folders)
   - Semantic code search via leann MCP (auto-installed on first run)

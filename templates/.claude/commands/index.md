@@ -9,6 +9,14 @@ Generate a project index file for faster navigation.
 - `/index --multi` - For multi-repo projects (create index in each sub-repo)
 - `/index --mono` - For monorepos (single index with package mapping)
 
+## Options
+
+- None (default) - Auto-detect project type and generate index
+- `--update` - Regenerate existing index
+- `--show` - Display current index contents
+- `--multi` - Force multi-repo mode (index each sub-repo)
+- `--mono` - Force monorepo mode (single index with packages)
+
 ## Project Types
 
 ### Multi-Repo (e.g., game project)

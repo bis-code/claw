@@ -15,6 +15,12 @@ Plan today's work using time-boxed, lens-enforced decision making.
 /plan-day --hours 2 --no-issues  # Skip GitHub, ask what to work on
 ```
 
+## Options
+
+- `--hours <number>` - Time budget in hours (required)
+- `--brainstorm` - Enable multi-agent analysis with CTO, Product, UX, QA perspectives
+- `--no-issues` - Skip GitHub issue fetching, ask user what to work on
+
 ## Execution
 
 ### Step 0: Initialize Project Index (Auto)
