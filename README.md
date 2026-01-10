@@ -2,12 +2,30 @@
 
 A powerful wrapper for Claude Code that adds project management, multi-repo support, and autonomous development workflows.
 
+## Installation (Local Setup)
+
+**Note:** This project is for local development only. Clone and build locally instead of using package managers.
+
+```bash
+# Clone the repository
+git clone https://github.com/bis-code/claw.git
+cd claw
+
+# Add to your PATH (choose one method)
+
+# Option 1: Symlink to /usr/local/bin
+sudo ln -s "$(pwd)/bin/claw" /usr/local/bin/claw
+
+# Option 2: Add to PATH in your shell config (~/.zshrc or ~/.bashrc)
+export PATH="$PATH:/path/to/claw/bin"
+
+# Verify installation
+claw --version
+```
+
 ## Quick Start
 
 ```bash
-# Install
-brew tap bis-code/tap && brew install claw
-
 # Use (drop-in replacement for claude)
 claw                      # Start interactive session
 claw "fix the bug"        # Start with prompt
