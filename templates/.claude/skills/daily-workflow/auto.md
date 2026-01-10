@@ -74,19 +74,19 @@ When you run `/auto` without specifying a discovery mode, you'll be prompted:
 
 Choose discovery depth for this session:
 
-1. Shallow - Fast & cheap (~55k tokens, $0.14)
+1. Shallow - Fast scan (~55k tokens)
    ✓ Quick daily scan, familiar codebase
    ✗ May miss deep issues
 
-2. Balanced - Smart mix (~120k tokens, $0.36) ⭐ Recommended
+2. Balanced - Smart mix (~120k tokens) ⭐ Recommended
    ✓ High quality where it matters
    ✓ Efficient for routine tasks
    ✓ Good for regular development
 
-3. Deep - Thorough audit (~450k tokens, $1.35)
+3. Deep - Thorough audit (~450k tokens)
    ✓ Maximum thoroughness
    ✓ Weekly/monthly audit
-   ✗ Expensive for daily use
+   ✗ Heavy for daily use
 
 Select [1-3] (default: 2):
 ```
@@ -103,16 +103,16 @@ if not discovery_mode_specified:
             "multiSelect": false,
             "options": [
                 {
-                    "label": "Shallow - Fast & cheap ($0.14)",
-                    "description": "Quick daily scan, ~55k tokens. May miss deep issues but good for familiar codebases."
+                    "label": "Shallow - Fast scan (~55k tokens)",
+                    "description": "Quick daily scan. May miss deep issues but good for familiar codebases."
                 },
                 {
-                    "label": "Balanced - Smart mix ($0.36) (Recommended)",
-                    "description": "High quality where it matters, efficient for routine tasks. Best for regular development. ~120k tokens."
+                    "label": "Balanced - Smart mix (~120k tokens) (Recommended)",
+                    "description": "High quality where it matters, efficient for routine tasks. Best for regular development."
                 },
                 {
-                    "label": "Deep - Thorough audit ($1.35)",
-                    "description": "Maximum thoroughness, ~450k tokens. Use for weekly/monthly audits or critical reviews."
+                    "label": "Deep - Thorough audit (~450k tokens)",
+                    "description": "Maximum thoroughness. Use for weekly/monthly audits or critical reviews."
                 }
             ]
         }]
@@ -124,7 +124,7 @@ if not discovery_mode_specified:
     for agent in agents_for_mode(selected_mode):
         print(f"  • {agent.name} ({agent.model}, ~{agent.tokens}k tokens)")
 
-    print(f"\nEstimated: ~{total_tokens}k tokens, ${total_cost}")
+    print(f"\nEstimated: ~{total_tokens}k tokens")
     print("\nContinue? [Y/n]")
 ```
 
@@ -297,13 +297,13 @@ Unit tests only"
 
 **Problem:** Original unoptimized implementation used ~450k tokens for discovery + brainstorm!
 
-**Solution:** Three modes to balance cost vs quality
+**Solution:** Three modes to balance token usage vs quality
 
-| Mode | Discovery | Brainstorm | Total | Cost | Quality |
-|------|-----------|------------|-------|------|---------|
-| **Deep** | 352k (Sonnet, unlimited) | 98k (Sonnet, all) | **450k** | $1.35 | ⭐⭐⭐⭐⭐ Most thorough |
-| **Balanced** ⭐ | 80k (Smart mix) | 40k (Smart mix) | **120k** | $0.36 | ⭐⭐⭐⭐ High quality, reasonable cost |
-| **Shallow** | 30k (Haiku, limited) | 25k (Haiku, skip simple) | **55k** | $0.14 | ⭐⭐⭐ Good for quick scans |
+| Mode | Discovery | Brainstorm | Total | Quality |
+|------|-----------|------------|-------|---------|
+| **Deep** | 352k (Sonnet, unlimited) | 98k (Sonnet, all) | **450k** | ⭐⭐⭐⭐⭐ Most thorough |
+| **Balanced** ⭐ | 80k (Smart mix) | 40k (Smart mix) | **120k** | ⭐⭐⭐⭐ High quality, efficient |
+| **Shallow** | 30k (Haiku, limited) | 25k (Haiku, skip simple) | **55k** | ⭐⭐⭐ Good for quick scans |
 
 **Balanced mode breakdown (recommended default):**
 
@@ -538,15 +538,15 @@ Only discovers and works on billing-related files. If not specified, works on al
 
 **Mode comparison:**
 
-| Mode | Model | Result Limit | max_turns | Tokens | Cost | When to Use |
-|------|-------|--------------|-----------|--------|------|-------------|
-| **shallow** | Haiku | 10 | 3 | ~40k | $0.01 | Quick daily scan, known codebase |
-| **balanced** | Haiku for simple<br>Sonnet for complex | 20 | 5 | ~120k | $0.36 | **Default** - good quality/cost balance |
-| **deep** | Sonnet | Unlimited | 10 | ~450k | $1.35 | Weekly audit, new codebase, thorough review |
+| Mode | Model | Result Limit | max_turns | Tokens | When to Use |
+|------|-------|--------------|-----------|--------|-------------|
+| **shallow** | Haiku | 10 | 3 | ~40k | Quick daily scan, known codebase |
+| **balanced** | Haiku for simple<br>Sonnet for complex | 20 | 5 | ~120k | **Default** - good quality/efficiency balance |
+| **deep** | Sonnet | Unlimited | 10 | ~450k | Weekly audit, new codebase, thorough review |
 
 **What changes per mode:**
 
-**Shallow (Fast & Cheap):**
+**Shallow (Fast):**
 - ✅ Good for: Daily maintenance, known codebase
 - ❌ Might miss: Deep issues, subtle security problems
 - Model: All Haiku

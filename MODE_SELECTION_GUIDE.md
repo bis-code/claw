@@ -13,19 +13,19 @@ When you run `/auto`, you'll see:
 
 Choose discovery depth for this session:
 
-1. Shallow - Fast & cheap (~55k tokens, $0.14)
+1. Shallow - Fast scan (~55k tokens)
    ✓ Quick daily scan, familiar codebase
    ✗ May miss deep issues
 
-2. Balanced - Smart mix (~120k tokens, $0.36) ⭐ Recommended
+2. Balanced - Smart mix (~120k tokens) ⭐ Recommended
    ✓ High quality where it matters
    ✓ Efficient for routine tasks
    ✓ Good for regular development
 
-3. Deep - Thorough audit (~450k tokens, $1.35)
+3. Deep - Thorough audit (~450k tokens)
    ✓ Maximum thoroughness
    ✓ Weekly/monthly audit
-   ✗ Expensive for daily use
+   ✗ Heavy for daily use
 
 Select [1-3] (default: 2): _
 ```
@@ -54,9 +54,8 @@ Do you need thorough analysis?
 
 | Aspect | Shallow | Balanced ⭐ | Deep |
 |--------|---------|------------|------|
-| **Cost** | $0.14 | $0.36 | $1.35 |
 | **Tokens** | ~55k | ~120k | ~450k |
-| **Time** | Fast (5-10 min) | Medium (10-20 min) | Slow (20-40 min) |
+| **Speed** | Fast | Medium | Slower |
 | **TODO scanning** | ✓ Good (Haiku) | ✓ Good (Haiku) | ✓✓ Excellent (Sonnet) |
 | **Security analysis** | ⚠️ Basic (Haiku) | ✓ Good (Sonnet) | ✓✓ Thorough (Sonnet) |
 | **Code quality** | ⚠️ Surface-level (Haiku) | ✓ Good (Sonnet) | ✓✓ Deep (Sonnet) |
@@ -192,22 +191,22 @@ Wednesday: /auto --discovery balanced --hours 6
 Thursday:  /auto --discovery shallow --hours 4   # Quick check
 Friday:    /auto --discovery deep --hours 8      # Weekly audit
 
-Weekly cost: ($0.36 × 3) + $0.14 + $1.35 = $2.57
-vs. Deep daily: $1.35 × 5 = $6.75
-Savings: 62%
+Weekly tokens: (~120k × 3) + ~55k + ~450k ≈ 865k
+vs. Deep daily: ~450k × 5 = 2.25M tokens
+Savings: 62% fewer tokens
 ```
 
 ---
 
 ## FAQ
 
-### Q: What if Balanced is still too expensive for me?
+### Q: What if Balanced uses too many tokens for me?
 
 **A:** Use Shallow for daily work, Balanced once a week:
 ```
-Mon-Thu: /auto --discovery shallow  ($0.14 × 4 = $0.56)
-Friday:  /auto --discovery balanced ($0.36)
-Weekly:  $0.92 (vs $1.80 balanced daily)
+Mon-Thu: /auto --discovery shallow  (~55k × 4 = ~220k tokens)
+Friday:  /auto --discovery balanced (~120k tokens)
+Weekly:  ~340k tokens (vs ~600k balanced daily)
 ```
 
 ### Q: What if I want even more thoroughness than Deep?

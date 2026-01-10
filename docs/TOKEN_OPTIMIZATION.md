@@ -256,36 +256,24 @@ if len(complex_issues) > 0:
 
 ---
 
-## Cost Comparison
-
-At Claude API pricing (as of 2026):
-
-### Sonnet 4.5
-- Input: $3 per 1M tokens
-- Output: $15 per 1M tokens
-
-### Haiku 3.5
-- Input: $0.25 per 1M tokens
-- Output: $1.25 per 1M tokens
-
-### Your Costs
+## Token Usage Summary
 
 **Before optimization:**
-- Discovery: 352k tokens × $3/1M = **$1.06**
-- Brainstorm: 98k tokens × $3/1M = **$0.29**
-- **Total: $1.35 per run** (just for discovery + brainstorm!)
+- Discovery: 352k tokens
+- Brainstorm: 98k tokens
+- **Total: ~450k tokens per run** (just for discovery + brainstorm!)
 
 **After optimization:**
-- Discovery: 38k tokens × $0.25/1M = **$0.01**
-- Brainstorm: 26k tokens × $0.25/1M = **$0.01**
-- **Total: $0.02 per run** 🎉
+- Discovery: 38k tokens
+- Brainstorm: 26k tokens
+- **Total: ~64k tokens per run** 🎉
 
-**Savings: ~$1.30 per run (98% cost reduction!)**
+**Savings: ~386k tokens per run (86% reduction!)**
 
 If running daily:
-- Before: $1.35 × 365 = **$493/year**
-- After: $0.02 × 365 = **$7/year**
-- **Annual savings: $486**
+- Before: 450k × 365 = **164M tokens/year**
+- After: 64k × 365 = **23M tokens/year**
+- **Annual savings: 141M tokens**
 
 ---
 
@@ -434,7 +422,6 @@ export CLAUDE_VERBOSE=1
 - Discovery: 352k → ~38k tokens (90% reduction)
 - Brainstorm: 98k → ~26k tokens (73% reduction)
 - **Total: 450k → ~64k tokens (86% reduction)**
-- **Cost: $1.35 → $0.02 per run (98% savings)**
 
 **Next Steps:**
 1. Update `auto.md` with these optimizations
