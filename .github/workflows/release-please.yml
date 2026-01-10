@@ -28,6 +28,7 @@ jobs:
         with:
           release-type: simple
           target-branch: main
+          skip-github-release: true  # Don't create release yet, do it after tests pass
 
       - name: Checkout repository
         if: ${{ steps.release.outputs.release_created }}
@@ -52,7 +53,7 @@ jobs:
           git tag v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}
           git push origin v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }} --force
 
-  # Build and publish release assets when release is created
+  # Build and test FIRST, then create release
   build-release:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
@@ -61,6 +62,7 @@ jobs:
       contents: write
     outputs:
       sha256: ${{ steps.tarball.outputs.sha256 }}
+      release_created: ${{ steps.create_release.outputs.release_created }}
 
     steps:
       - name: Checkout repository
@@ -76,6 +78,14 @@ jobs:
 
       - name: Run tests
         run: ./tests/bats/bin/bats tests/*.bats
+
+      - name: Extract release notes
+        id: release_notes
+        run: |
+          VERSION=${{ needs.release-please.outputs.version }}
+          # Extract just this version's notes from CHANGELOG.md
+          awk "/## \[${VERSION}\]/,/## \[/{if(/## \[${VERSION}\]/)f=1; else if(/## \[/)exit; if(f)print}" CHANGELOG.md > release-notes.md
+          cat release-notes.md
 
       - name: Create release tarball
         id: tarball
@@ -101,11 +111,17 @@ jobs:
           echo "sha256=${SHA256}" >> $GITHUB_OUTPUT
           echo "Created ${TARBALL_NAME} with SHA256: ${SHA256}"
 
-      - name: Upload tarball to release
+      # Create GitHub release only after tests pass
+      - name: Create GitHub Release
+        id: create_release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ needs.release-please.outputs.tag_name }}
+          name: ${{ needs.release-please.outputs.tag_name }}
+          body_path: release-notes.md
           files: claw-${{ needs.release-please.outputs.version }}.tar.gz
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
