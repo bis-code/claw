@@ -1,5 +1,7 @@
 # /plan-day
 
+> **Note:** `/plan-day` is now an alias for `/auto --plan-only`. For full autonomous execution, use `/auto` instead.
+
 Time-boxed daily planning with lens-enforced decision making.
 
 ## Philosophy
@@ -19,10 +21,18 @@ You apply lenses to improve decision quality and surface trade-offs.
 
 ## Invocation
 
-```
+### Direct (Legacy)
+```bash
 /plan-day --hours 4              # Plan for 4 hours
 /plan-day --hours 6 --brainstorm # Full multi-agent analysis
 /plan-day --hours 2 --no-issues  # Manual input mode
+```
+
+### Via /auto (Recommended)
+```bash
+/auto --plan-only                # Uses default 4 hours
+/auto --plan-only --hours 6      # Custom time budget
+/auto --plan-only --focus "billing"  # Focus on specific area
 ```
 
 ---
@@ -160,7 +170,88 @@ Detect project stage from context and adjust:
 --no-issues     (optional) Skip GitHub, ask for input
 ```
 
-### Step 2: Gather Candidates
+### Step 2: Read Yesterday's Context
+
+**Purpose**: Provide continuity from previous day's work and priorities.
+
+**Check for yesterday's wind-down note**:
+```bash
+# Calculate yesterday's date
+YESTERDAY=$(date -v-1d +%Y-%m-%d 2>/dev/null || date -d "yesterday" +%Y-%m-%d)
+
+# Try Obsidian vault first, fallback to claw daily
+if [[ -f "$HOME/Documents/Obsidian/Daily/${YESTERDAY}.md" ]]; then
+    DAILY_NOTE="$HOME/Documents/Obsidian/Daily/${YESTERDAY}.md"
+elif [[ -f "$HOME/.claw/daily/${YESTERDAY}.md" ]]; then
+    DAILY_NOTE="$HOME/.claw/daily/${YESTERDAY}.md"
+else
+    DAILY_NOTE=""  # No note found - first day or skipped wind-down
+fi
+```
+
+**Parse relevant sections if note exists**:
+```bash
+if [[ -n "$DAILY_NOTE" ]]; then
+    # Extract Tomorrow's Priorities (becomes "Yesterday's Plans")
+    YESTERDAY_PRIORITIES=$(sed -n '/## 🎯 Tomorrow'\''s Priorities/,/^##/p' "$DAILY_NOTE" | grep -v '^##')
+
+    # Extract Focus & Context
+    FOCUS_STEALERS=$(grep '**What'\''s stealing focus:**' "$DAILY_NOTE" | sed 's/.*: //')
+
+    # Extract Energy Level
+    ENERGY_LEVEL=$(grep '\*\*Energy level:\*\*' "$DAILY_NOTE" | grep -oE '[0-9]+/10')
+
+    # Extract Work Done (to avoid duplication)
+    WORK_DONE=$(sed -n '/## 💼 Work Done Today/,/^##/p' "$DAILY_NOTE" | grep -v '^##')
+    PERSONAL_DONE=$(sed -n '/## 🎮 Personal Work Done Today/,/^##/p' "$DAILY_NOTE" | grep -v '^##')
+fi
+```
+
+**Display context to user**:
+```markdown
+📖 Context from yesterday (YYYY-MM-DD):
+
+**Yesterday you planned to:**
+{YESTERDAY_PRIORITIES or "No priorities set"}
+
+**Focus stealers:** {FOCUS_STEALERS or "None noted"}
+**Energy level:** {ENERGY_LEVEL or "Not tracked"}
+
+**Work completed yesterday:**
+{Summary of WORK_DONE and PERSONAL_DONE}
+
+Want to continue these priorities today, or start fresh?
+- Continue yesterday's priorities (add to today's queue)
+- Start fresh (plan from scratch)
+- Mix (keep some, add new)
+```
+
+**Optional: Multi-Day Pattern Analysis**
+
+If `--patterns` flag is set, check last 3-7 days:
+```bash
+# Analyze last 7 days
+for i in {1..7}; do
+    DATE=$(date -v-${i}d +%Y-%m-%d 2>/dev/null || date -d "${i} days ago" +%Y-%m-%d)
+    if [[ -f "$HOME/Documents/Obsidian/Daily/${DATE}.md" ]]; then
+        # Extract recurring blockers, energy trends, unfinished priorities
+    fi
+done
+
+# Show patterns:
+# - "Focus stealers appearing 3+ times: Email notifications, Slack"
+# - "Average energy: 6.5/10 (trending up)"
+# - "Unfinished priorities: Review PR #42 (3 days old)"
+```
+
+**Edge Cases**:
+- **No note found**: Skip context, proceed normally
+- **Multiple missed days**: Offer to check all missed days
+- **User declines context**: Proceed normally (don't force)
+
+### Step 3: Gather Candidates
+
+**ultrathink:** Apply comprehensive reasoning to analyze all candidates, evaluate tradeoffs, and create an optimal execution plan.
 
 **Default: Fetch from ALL tracked repos**
 

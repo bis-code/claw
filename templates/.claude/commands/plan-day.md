@@ -1,18 +1,28 @@
 ---
-description: Plan the day's work based on available hours using lens-based analysis
+description: Plan the day's work based on available hours using lens-based analysis (alias for /auto --plan-only)
 args: --hours <number> [--brainstorm] [--no-issues]
 ---
 
 # /plan-day --hours X
 
+> **Note:** `/plan-day` is now an alias for `/auto --plan-only`. For full autonomous execution, use `/auto` instead.
+
 Plan today's work using time-boxed, lens-enforced decision making.
 
 ## Usage
 
-```
+### Direct (Legacy)
+```bash
 /plan-day --hours 4              # Plan for 4 hours of work
 /plan-day --hours 6 --brainstorm # Full multi-agent analysis
 /plan-day --hours 2 --no-issues  # Skip GitHub, ask what to work on
+```
+
+### Via /auto (Recommended)
+```bash
+/auto --plan-only                # Uses default 4 hours
+/auto --plan-only --hours 6      # Custom time budget
+/auto --plan-only --focus "billing"  # Focus on specific area
 ```
 
 ## Options

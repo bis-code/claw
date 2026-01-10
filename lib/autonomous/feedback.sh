@@ -171,7 +171,7 @@ _parse_jest_errors() {
         fi
     done < "$file"
 
-    if [[ "$json_output" == "true" ]]; then
+    if $json_output; then
         jq -n \
             --arg file "$test_file" \
             --arg line "$line_num" \
@@ -209,7 +209,7 @@ _parse_pytest_errors() {
         fi
     done < "$file"
 
-    if [[ "$json_output" == "true" ]]; then
+    if $json_output; then
         jq -n \
             --arg file "$test_file" \
             --arg test "$test_name" \

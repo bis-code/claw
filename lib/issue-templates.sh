@@ -234,7 +234,7 @@ handle_templates_command() {
                                     break
                                 fi
                             done
-                            if [[ "$is_template" == "false" ]]; then
+                            if ! $is_template; then
                                 project_name="$1"
                                 shift
                             fi
@@ -263,7 +263,7 @@ handle_templates_command() {
             fi
 
             # Install to all project repos
-            if [[ "$install_to_project" == "true" ]]; then
+            if $install_to_project; then
                 # Use provided project name or detect from current directory
                 if [[ -z "$project_name" ]]; then
                     project_name=$(get_current_project 2>/dev/null || echo "")

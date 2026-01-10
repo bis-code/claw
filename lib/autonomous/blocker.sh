@@ -225,7 +225,7 @@ check_intervention_resolved() {
         resolved=$(jq -r '.resolved // false' "$INTERVENTION_RESPONSE_FILE")
         action=$(jq -r '.action // ""' "$INTERVENTION_RESPONSE_FILE")
 
-        if [[ "$resolved" == "true" ]]; then
+        if $resolved; then
             echo "Intervention resolved: $action"
             return 0
         fi

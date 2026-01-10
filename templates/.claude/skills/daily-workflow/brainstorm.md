@@ -20,6 +20,58 @@ Or with specific agents:
 
 ---
 
+## Token Optimization ⚠️
+
+**Problem:** Original brainstorm used ~98k tokens (5 agents × ~20k each)
+
+**Solution:** Optimized brainstorm uses ~25k tokens (75% reduction)
+
+### How to Optimize
+
+1. **Use Haiku for all agents** (not Sonnet!)
+   ```python
+   Task(
+       subagent_type="senior-dev",
+       model="haiku",  # ✅ 10-20x cheaper
+       max_turns=2     # ✅ Limit analysis depth
+   )
+   ```
+
+2. **Skip brainstorm for obvious issues**
+   - ❌ Don't brainstorm: Simple TODOs, test additions, dependency updates
+   - ✅ Do brainstorm: Security issues, architecture changes, UX features
+
+3. **Reduce agent count for technical issues**
+   - Technical issues: Just Senior Dev + CTO + QA (3 agents)
+   - User-facing issues: All 5 agents
+   - Backend refactors: Skip UX and Product (3 agents)
+
+4. **Set max_turns: 2** (not unlimited!)
+   - Phase 1: Analysis (1 turn)
+   - Phase 2: Debate (1 turn)
+   - No endless exploration
+
+### Expected Results
+
+| Configuration | Agents | Tokens per Agent | Total |
+|---------------|--------|------------------|-------|
+| Original (Sonnet, all issues) | 5 | ~20k | ~98k |
+| Optimized (Haiku, complex only) | 3-5 | ~5k | ~25k |
+| **Savings** | - | - | **~73k (75%)** |
+
+**When to use which agents:**
+
+| Issue Type | Agents Needed | Why |
+|------------|---------------|-----|
+| Security issue | CTO + QA + Senior Dev | Need security expertise |
+| Architecture change | CTO + Senior Dev | Need system thinking |
+| User-facing feature | All 5 | Need UX + Product input |
+| Simple TODO | **Skip brainstorm** | Just implement it |
+| Test addition | **Skip brainstorm** | Obvious what's needed |
+| Dependency update | **Skip brainstorm** | Just update it |
+
+---
+
 ## Agent Roster
 
 | Agent | Role | Focus | Typical Output |
@@ -98,7 +150,7 @@ Or with specific agents:
 ### Senior Developer Agent
 
 ```markdown
-You are a Senior Developer analyzing issues for today's sprint.
+ultrathink: You are a Senior Developer analyzing issues for today's sprint.
 
 Your focus:
 - Code quality and maintainability
@@ -119,7 +171,7 @@ Express disagreements constructively.
 ### Product Owner Agent
 
 ```markdown
-You are a Product Owner analyzing issues for today's sprint.
+ultrathink: You are a Product Owner analyzing issues for today's sprint.
 
 Your focus:
 - User value and business impact
@@ -139,7 +191,7 @@ Think about: What moves the needle most for users today?
 ### CTO/Architect Agent
 
 ```markdown
-You are a CTO/Architect analyzing issues for today's sprint.
+ultrathink: You are a CTO/Architect analyzing issues for today's sprint.
 
 Your focus:
 - System architecture and design
@@ -160,7 +212,7 @@ Use: gh issue create --title "Tech Debt: X" --label "tech-debt"
 ### QA Engineer Agent
 
 ```markdown
-You are a QA Engineer analyzing issues for today's sprint.
+ultrathink: You are a QA Engineer analyzing issues for today's sprint.
 
 Your focus:
 - Test coverage requirements
@@ -180,7 +232,7 @@ If test strategy seems insufficient, flag it strongly.
 ### UX Designer Agent
 
 ```markdown
-You are a UX Designer analyzing issues for today's sprint.
+ultrathink: You are a UX Designer analyzing issues for today's sprint.
 
 Your focus:
 - User experience and flow
