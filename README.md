@@ -70,7 +70,7 @@ All commands are available inside any Claude session started with `claw`. Use th
 
 | Command | Flags | Description |
 |---------|-------|-------------|
-| `/plan-day` | `--hours N` (required)<br>`--brainstorm`<br>`--no-issues` | Plan the day's work from GitHub issues<br>Uses lens-based analysis (Value, Risk, Effort, Security) |
+| `/plan-day` | `--hours N` (required)<br>`--brainstorm`<br>`--no-issues` | Alias for `/auto --plan-only`<br>Plan the day's work from GitHub issues<br>Uses lens-based analysis (Value, Risk, Effort, Security) |
 | `/next` | None | Pick up next issue from today's plan |
 | `/done` | None | Mark current issue as complete, update status |
 | `/ship-day` | None | End of day: squash commits, create PR, close issues |
@@ -79,16 +79,16 @@ All commands are available inside any Claude session started with `claw`. Use th
 
 | Command | Flags | Description |
 |---------|-------|-------------|
-| `/auto-pilot` | `--hours N` (default: 4)<br>`--focus "area"`<br>`--discovery [deep\|shallow\|none]`<br>`--discover-only` | Full autonomous mode: discover work, plan, execute, ship<br>Runs entire development cycle without human interaction |
+| `/auto` | `--hours N` (default: 4)<br>`--focus "area"`<br>`--discovery [deep\|shallow\|none]`<br>`--plan-only`<br>`--skip-discovery` | **One command to rule them all**<br>Full autonomous mode: discover work, plan, execute, ship<br>Use `--plan-only` to stop after planning |
 | `/self-improve` | `--hours N` (default: 2)<br>`--focus "area"`<br>`--dry-run`<br>`--max-commits N` (default: 20) | Autonomous code quality improvements<br>Discovers issues, researches best practices, creates PR |
-| `/autonomous` | None | Execute tasks from queue with TDD and blocker handling |
 
 ### Analysis & Planning
 
 | Command | Flags | Description |
 |---------|-------|-------------|
-| `/brainstorm` | None | Multi-agent collaborative planning with parallel analysis<br>Includes CTO, Senior Dev, UX, QA, Product Owner perspectives |
 | `/pivot` | None | Handle mid-day changes: blocker, better idea, scope change<br>Documents reason and updates plan |
+
+**Note:** `/plan-day` is now an alias for `/auto --plan-only`. `/brainstorm` and `/autonomous` are internal commands called by `/auto`.
 
 ### Utilities
 
@@ -107,11 +107,11 @@ cd ~/projects/my-saas/api
 claw
 
 # Inside Claude session:
-/plan-day --hours 6        # Plan the day
+/auto --plan-only --hours 6  # Plan the day (or just /plan-day --hours 6)
 # ... work on issues ...
-/done                      # After completing an issue
-/next                      # Start next issue
-/ship-day                  # End of day
+/done                        # After completing an issue
+/next                        # Start next issue
+/ship-day                    # End of day
 ```
 
 ### Autonomous Mode Example
@@ -119,8 +119,11 @@ claw
 ```bash
 claw
 
-# Let Claude discover and fix issues autonomously
-/auto-pilot --hours 4
+# Full autonomous cycle (discover → plan → execute → ship)
+/auto --hours 4              # Default: 4 hours
+
+# Or just plan without execution
+/auto --plan-only --hours 6  # Discover and plan only
 
 # Or just improve code quality
 /self-improve --hours 2
@@ -279,9 +282,8 @@ export MAX_THINKING_TOKENS=31999
 ```
 
 This enables comprehensive reasoning during:
-- `/plan-day` - Daily work prioritization
-- `/brainstorm` - Multi-agent planning
-- `/auto-pilot` - Autonomous execution planning
+- `/auto` - Full autonomous development (discovery, planning, execution)
+- `/auto --plan-only` - Daily work prioritization (same as `/plan-day`)
 - Complex architectural decisions
 
 **Benefits**: Deeper analysis, better edge case identification, more thorough risk assessment.

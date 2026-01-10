@@ -28,9 +28,8 @@ Extended thinking is **mandatory** for:
 - Deployment strategies
 
 ### Multi-Step Workflows
-- `/plan-day` - Daily work prioritization
-- `/brainstorm` - Multi-agent planning
-- `/auto-pilot` - Autonomous execution planning
+- `/auto` - Unified autonomous development (discovery, planning, execution)
+- `/plan-day` - Daily work prioritization (alias for `/auto --plan-only`)
 - Feature implementation planning
 - Test strategy design
 
@@ -129,9 +128,8 @@ Lead-Level Questions:
 
 The following claw features automatically use extended thinking:
 
-- **`/plan-day`** - Optimal issue prioritization
-- **`/brainstorm`** - Multi-agent collaborative planning
-- **`/auto-pilot`** - Discovery, prioritization, and execution planning
+- **`/auto`** - Unified autonomous development (discovery, planning, execution)
+- **`/plan-day`** - Daily work prioritization (alias for `/auto --plan-only`)
 - **`/pivot`** - Evaluating scope changes and blockers
 - **PR reviews** - Comprehensive code analysis
 - **Architecture questions** - System design guidance

@@ -8,7 +8,7 @@ Autonomous daily development workflow with multi-agent AI collaboration.
 |---------|---------|----------------|
 | `/plan-day` | Start the day - fetch issues, analyze, create branch | Basic |
 | `/brainstorm` | Multi-agent collaborative planning session | Multi-Agent |
-| `/auto-pilot` | Full autonomous: discover, plan, execute, ship | Full Autonomy |
+| `/auto` | Full autonomous: discover, plan, execute, ship | Full Autonomy |
 | `/next` | Pick up the next issue from today's plan | Manual |
 | `/done` | Mark current issue as complete | Manual |
 | `/pivot` | Handle mid-day changes (blocker, idea, scope, urgent) | Manual |
@@ -20,7 +20,7 @@ Autonomous daily development workflow with multi-agent AI collaboration.
 ```
 Manual           Multi-Agent           Full Autonomy
 ──────           ───────────           ─────────────
-/plan-day        /brainstorm           /auto-pilot
+/plan-day        /brainstorm           /auto
 /next            /plan-day              │
 /done             --brainstorm          ├── Discovery
 /pivot                                  ├── Brainstorm
@@ -61,7 +61,7 @@ Daily state is stored in `.claude/daily/YYYY-MM-DD.md`
 
 ### Full Autonomous Mode
 ```
-/auto-pilot
+/auto
      │
      ├── 1. Discovery (find work in codebase)
      ├── 2. Create issues (auto-labeled)

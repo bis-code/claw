@@ -1,5 +1,7 @@
 # /plan-day
 
+> **Note:** `/plan-day` is now an alias for `/auto --plan-only`. For full autonomous execution, use `/auto` instead.
+
 Time-boxed daily planning with lens-enforced decision making.
 
 ## Philosophy
@@ -19,10 +21,18 @@ You apply lenses to improve decision quality and surface trade-offs.
 
 ## Invocation
 
-```
+### Direct (Legacy)
+```bash
 /plan-day --hours 4              # Plan for 4 hours
 /plan-day --hours 6 --brainstorm # Full multi-agent analysis
 /plan-day --hours 2 --no-issues  # Manual input mode
+```
+
+### Via /auto (Recommended)
+```bash
+/auto --plan-only                # Uses default 4 hours
+/auto --plan-only --hours 6      # Custom time budget
+/auto --plan-only --focus "billing"  # Focus on specific area
 ```
 
 ---

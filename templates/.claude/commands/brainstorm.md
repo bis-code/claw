@@ -1,8 +1,10 @@
 ---
-description: Multi-agent collaborative planning with parallel analysis and debate
+description: Multi-agent collaborative planning with parallel analysis and debate (internal - called by /auto)
 ---
 
 # Multi-Agent Brainstorm
+
+> **Note:** This is an internal command called by `/auto`. For everyday use, run `/auto` or `/auto --plan-only` instead.
 
 Spawn multiple specialized agents to analyze today's issues collaboratively.
 

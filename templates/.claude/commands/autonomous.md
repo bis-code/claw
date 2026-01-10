@@ -1,9 +1,11 @@
 ---
-description: Execute tasks from queue with TDD, feedback loops, and blocker handling
+description: Execute tasks from queue with TDD, feedback loops, and blocker handling (internal - called by /auto)
 args: [--init] [--import] [--run] [--status] [--checkpoint NAME]
 ---
 
 # /autonomous - Autonomous Task Executor
+
+> **Note:** This is an internal command called by `/auto`. For everyday use, run `/auto` instead.
 
 Run tasks from the queue with automatic test feedback, checkpointing, and blocker resolution.
 

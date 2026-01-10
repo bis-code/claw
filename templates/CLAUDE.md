@@ -70,6 +70,38 @@ On every session start or resume:
 
 ---
 
+## Autonomous Development: /auto Command
+
+The `/auto` command is your **single entry point** for autonomous work.
+
+### Quick Start
+
+```bash
+/auto                           # Full cycle: discover → plan → execute → ship (4 hours)
+/auto --plan-only               # Just discover and plan, then stop
+/auto --skip-discovery          # Plan and execute existing issues only
+```
+
+### What It Does
+
+1. **Discovery**: Launches 5 agents to find work (TODOs, test gaps, security issues)
+2. **Context Reading**: Parses yesterday's wind-down notes for continuity
+3. **Planning**: Multi-agent brainstorming with 5 perspectives
+4. **Execution**: TDD-driven implementation with autonomous error handling
+5. **Shipping**: Squash commits, create PR, close issues
+
+### Aliases
+
+- `/plan-day` → `/auto --plan-only` (backwards compatibility)
+- `/brainstorm` - Internal (called by `/auto`)
+- `/autonomous` - Internal (called by `/auto`)
+
+**Recommendation:** Use `/auto` for everything. It's intelligent by default.
+
+See `.claude/commands/auto.md` for full documentation.
+
+---
+
 ## Extended Thinking (Enabled)
 
 Claude Code supports **extended thinking** for complex planning and decision-making.
@@ -92,9 +124,8 @@ claude-code config set thinking.enabled true
 ### When Extended Thinking is Used
 
 Extended thinking is **automatically enabled** for:
-- `/plan-day` - Daily work prioritization
-- `/brainstorm` - Multi-agent collaborative planning
-- `/auto-pilot` - Autonomous discovery and execution planning
+- `/auto` - Unified autonomous development (discovery, planning, execution)
+- `/plan-day` - Daily work prioritization (alias for `/auto --plan-only`)
 - Complex architectural decisions
 - Security analysis
 - Performance optimization planning

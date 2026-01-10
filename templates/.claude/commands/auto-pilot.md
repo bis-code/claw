@@ -1,85 +1,39 @@
 ---
-description: Full autonomous mode - discover work, plan, execute, and ship (project)
+description: (DEPRECATED - Use /auto instead) Full autonomous mode - discover, plan, execute, ship
 ---
 
-# Auto-Pilot - Full Autonomous Development
+# /auto-pilot (DEPRECATED)
 
-Run a complete autonomous development cycle with a **4-hour default time budget**.
+> **⚠️ DEPRECATED:** `/auto-pilot` has been renamed to `/auto`.
+>
+> Please update your workflows to use `/auto` instead.
 
-> **Default behavior:** Claude will work autonomously for up to 4 hours, then ship and report.
-
-## Phase 1: Discovery
-
-Launch discovery agents in parallel to find work:
-
-1. **TODO Scanner**: `grep -rn "TODO\|FIXME\|HACK" --include="*.go" --include="*.ts"`
-2. **Test Coverage Agent**: Find files without tests, missing E2E flows
-3. **Code Quality Agent**: Long functions, duplication, inconsistent patterns
-4. **Security Agent**: Hardcoded secrets, injection risks, missing auth
-5. **Dependency Agent**: `npm outdated`, `go list -m -u all`
-
-Each agent creates GitHub issues for significant findings.
-
-## Phase 2: Aggregate & Prioritize
-
-Combine existing `claude-ready` issues with discovered issues.
-Deduplicate and prioritize:
-- Security → P0
-- Test gaps on critical paths → P1
-- Tech debt in active areas → P2
-- TODOs → P3
-
-## Phase 3: Brainstorm
-
-Run `/brainstorm` with all issues for multi-agent planning.
-
-## Phase 4: Execute (Autonomous)
-
-Uses the autonomous executor for TDD-driven implementation:
+## Migration Guide
 
 ```bash
-# Initialize and import prioritized issues
-/autonomous --init
-/autonomous --import --label "in-progress"
+# Old command (deprecated)
+/auto-pilot --hours 4
+/auto-pilot --discover-only
+/auto-pilot --discovery none
 
-# Run with feedback loops and blocker handling
-/autonomous --run --loop
+# New command (recommended)
+/auto --hours 4
+/auto --plan-only
+/auto --skip-discovery
 ```
 
-The executor:
-1. Creates checkpoint before each task
-2. Runs tests first (TDD)
-3. Parses errors and suggests fixes
-4. Auto-resolves blockers (missing deps, rate limits)
-5. Requests human help for fatal blockers (permissions, auth)
-6. Commits on success, logs failure on error
+## What Changed
 
-## Phase 5: Ship
+| Old `/auto-pilot` | New `/auto` | Notes |
+|-------------------|-------------|-------|
+| `--discover-only` | `--plan-only` | More accurate naming |
+| `--discovery none` | `--skip-discovery` | Clearer intent |
+| `/plan-day` calls `/auto-pilot` | `/plan-day` calls `/auto --plan-only` | Alias updated |
 
-Run `/ship-day` to squash, create PR, close issues.
+## Full Documentation
 
-## Options
-- `--hours N`: Time budget in hours (default: **4 hours**)
-- `--focus "area"`: Focus on specific area (optional)
-- `--discovery [deep|shallow|none]`: Discovery depth (default: shallow)
-- `--discover-only`: Just discover, don't execute
+See `/auto` or `.claude/commands/auto.md` for complete documentation.
 
-## Safety Rails
-- Pause for human input on security-critical changes
-- Create backup tag before execution
-- Max 10 issues created, 20 commits per session
+---
 
-Reference `.claude/skills/daily-workflow/auto-pilot.md` for full details.
-
-## Autonomous Modules
-
-The execution engine is powered by:
-
-| Module | Location | Purpose |
-|--------|----------|---------|
-| executor.sh | `lib/autonomous/` | Task queue, execution loop |
-| feedback.sh | `lib/autonomous/` | Test runner, error parsing |
-| blocker.sh | `lib/autonomous/` | Blocker detection, resolution |
-| checkpoint.sh | `lib/autonomous/` | State persistence, rollback |
-
-See `/autonomous --help` for standalone usage.
+**This deprecation notice will be removed in a future version.**

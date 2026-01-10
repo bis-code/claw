@@ -16,5 +16,5 @@
 - Match existing test patterns.
 
 ## Operating Modes
-- Default: code + test. Use /auto-pilot for autonomous work.
-- Use /plan-day to structure work sessions.
+- Default: code + test. Use /auto for autonomous work.
+- Use /auto --plan-only (or /plan-day) to structure work sessions.
