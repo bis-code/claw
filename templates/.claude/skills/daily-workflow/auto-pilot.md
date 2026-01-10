@@ -17,22 +17,23 @@ Fully autonomous development mode. AI discovers, plans, executes, and ships.
 **IMPORTANT:** Auto-pilot runs a COMPLETE cycle by default. It does NOT stop after discovery.
 
 ```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│  DISCOVER   │───▶│   EXECUTE   │───▶│    SHIP     │───▶│   REPORT    │
-│  (phase 1)  │    │  (phase 4)  │    │  (phase 5)  │    │             │
-└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
-     │                    │
-     ▼                    ▼
- Creates issues      Works on discovered
- + existing ones     AND existing issues
+┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
+│ DISCOVER │───▶│ CONTEXT  │───▶│ EXECUTE  │───▶│   SHIP   │───▶│  REPORT  │
+│ (phase1) │    │ (phase2) │    │(phase5)  │    │(phase6)  │    │          │
+└──────────┘    └──────────┘    └──────────┘    └──────────┘    └──────────┘
+     │               │                │
+     ▼               ▼                ▼
+ Creates      Reads yesterday    Works on all
+ new issues   & patterns         prioritized tasks
 ```
 
 1. **Discovers** work by analyzing the codebase (creates GitHub issues)
-2. **Aggregates** discovered issues with existing `claude-ready` issues
-3. **Brainstorms** with multi-agent planning on ALL issues
-4. **Executes** implementations with TDD (works through the queue)
-5. **Ships** completed work (creates PRs, closes issues)
-6. **Reports** with full summary of discovered + completed items
+2. **Reads context** from yesterday's wind-down notes (priorities, blockers, energy)
+3. **Aggregates** discovered + existing + yesterday's unfinished work
+4. **Brainstorms** with multi-agent planning on ALL issues
+5. **Executes** implementations with TDD (works through the queue)
+6. **Ships** completed work (creates PRs, closes issues)
+7. **Reports** with full summary of discovered + completed items
 
 **Time budget applies to the ENTIRE cycle**, not just execution.
 
@@ -146,9 +147,43 @@ Unit tests only"
 
 ---
 
-## Phase 2: Aggregate & Prioritize
+## Phase 2: Read Yesterday's Context
 
-**This phase happens IMMEDIATELY after discovery** (unless `--discover-only`).
+**Purpose**: Provide continuity and learn from previous day's work.
+
+**Same implementation as `/plan-day` Step 2**:
+- Check for yesterday's wind-down note (Obsidian or ~/.claw/daily/)
+- Parse: Tomorrow's Priorities, Focus Stealers, Energy Level, Work Done
+- Display context to user
+- Optional: Multi-day pattern analysis with `--patterns`
+
+**Auto-pilot specific usage**:
+```markdown
+📖 Context from yesterday:
+
+**Yesterday's unfinished priorities:**
+- [ ] Review PR #42
+- [ ] Write tests for auth module
+
+**These will be considered in discovery prioritization.**
+
+Continue? (yes/no)
+```
+
+**Integration with Discovery**:
+- Unfinished priorities from yesterday → elevated to P1
+- Recurring blockers → flagged in discovery report
+- Energy trends → influence time budget allocation
+
+**Edge Cases**: Same as `/plan-day` - gracefully handle missing notes.
+
+---
+
+## Phase 3: Aggregate & Prioritize
+
+**ultrathink:** Apply comprehensive reasoning to analyze all discovered and existing issues, evaluate dependencies, and create an optimal execution strategy.
+
+**This phase happens IMMEDIATELY after discovery and context reading** (unless `--discover-only`).
 
 After discovery, the orchestrator:
 
@@ -183,9 +218,9 @@ The aggregator groups issues by repository for prioritization.
 
 ---
 
-## Phase 3: Brainstorm
+## Phase 4: Brainstorm
 
-Invokes `/brainstorm` with all issues (existing + discovered):
+Invokes `/brainstorm` with all issues (existing + discovered + yesterday's unfinished):
 
 - Senior Developer analyzes implementation approaches
 - Product Owner validates priority ordering
@@ -197,7 +232,7 @@ Output: Prioritized plan for today
 
 ---
 
-## Phase 4: Execute
+## Phase 5: Execute
 
 The **Senior Developer Agent** takes over:
 
@@ -260,7 +295,7 @@ During execution, if the Senior Dev agent encounters a blocker:
 
 ---
 
-## Phase 5: Ship
+## Phase 6: Ship
 
 Invokes `/ship-day`:
 

@@ -98,7 +98,7 @@ Or with specific agents:
 ### Senior Developer Agent
 
 ```markdown
-You are a Senior Developer analyzing issues for today's sprint.
+ultrathink: You are a Senior Developer analyzing issues for today's sprint.
 
 Your focus:
 - Code quality and maintainability
@@ -119,7 +119,7 @@ Express disagreements constructively.
 ### Product Owner Agent
 
 ```markdown
-You are a Product Owner analyzing issues for today's sprint.
+ultrathink: You are a Product Owner analyzing issues for today's sprint.
 
 Your focus:
 - User value and business impact
@@ -139,7 +139,7 @@ Think about: What moves the needle most for users today?
 ### CTO/Architect Agent
 
 ```markdown
-You are a CTO/Architect analyzing issues for today's sprint.
+ultrathink: You are a CTO/Architect analyzing issues for today's sprint.
 
 Your focus:
 - System architecture and design
@@ -160,7 +160,7 @@ Use: gh issue create --title "Tech Debt: X" --label "tech-debt"
 ### QA Engineer Agent
 
 ```markdown
-You are a QA Engineer analyzing issues for today's sprint.
+ultrathink: You are a QA Engineer analyzing issues for today's sprint.
 
 Your focus:
 - Test coverage requirements
@@ -180,7 +180,7 @@ If test strategy seems insufficient, flag it strongly.
 ### UX Designer Agent
 
 ```markdown
-You are a UX Designer analyzing issues for today's sprint.
+ultrathink: You are a UX Designer analyzing issues for today's sprint.
 
 Your focus:
 - User experience and flow
