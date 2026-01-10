@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.5.0](https://github.com/bis-code/claw/compare/v1.4.1...v1.5.0) (2026-01-10)
+
+
+### Features
+
+* **auto:** consolidate commands + token optimization + clarify --hours ([211ccdd](https://github.com/bis-code/claw/commit/211ccdddfb619422644e71909fdf7245b91a0977))
+* autonomous improvements - extended thinking, wind-down integration, self-improve audit ([#28](https://github.com/bis-code/claw/issues/28)) ([3f5d9d3](https://github.com/bis-code/claw/commit/3f5d9d33ff25fc0d88c49582b5d806a14cca5666))
+* **core:** autonomous code quality improvements - tests, utilities, refactoring ([#24](https://github.com/bis-code/claw/issues/24)) ([853dfd3](https://github.com/bis-code/claw/commit/853dfd3f7d67e018bb9e8315fc0bb0076ce16d83))
+
 ## [1.2.0](https://github.com/bis-code/claw/compare/v1.1.5...v1.2.0) (2026-01-07)
 
 
