@@ -70,6 +70,46 @@ On every session start or resume:
 
 ---
 
+## Extended Thinking (Enabled)
+
+Claude Code supports **extended thinking** for complex planning and decision-making.
+
+### Configuration
+
+**Recommended**: Enable extended thinking globally for this project:
+
+```bash
+# Option 1: Environment variable (persistent)
+export MAX_THINKING_TOKENS=31999
+
+# Option 2: Global setting
+claude-code config set thinking.enabled true
+
+# Option 3: Session toggle (temporary)
+# Press Option+T (macOS) or Alt+T (Windows/Linux)
+```
+
+### When Extended Thinking is Used
+
+Extended thinking is **automatically enabled** for:
+- `/plan-day` - Daily work prioritization
+- `/brainstorm` - Multi-agent collaborative planning
+- `/auto-pilot` - Autonomous discovery and execution planning
+- Complex architectural decisions
+- Security analysis
+- Performance optimization planning
+
+### Benefits
+
+- **Deeper analysis** of tradeoffs and alternatives
+- **Better edge case identification**
+- **More thorough risk assessment**
+- **Self-correction** during reasoning
+
+See `.claude/rules/extended-thinking.md` for complete details.
+
+---
+
 ## Detailed Rules
 
 See `.claude/rules/` for comprehensive guidelines:
@@ -82,6 +122,7 @@ See `.claude/rules/` for comprehensive guidelines:
 | `security.md` | Security & abuse prevention |
 | `lead-reasoning.md` | Decision documentation |
 | `operating-modes.md` | PLAN, IMPLEMENT, TEST, QA modes |
+| `extended-thinking.md` | Comprehensive reasoning for complex tasks |
 | `efficient-search.md` | Search optimization, /search usage |
 
 ---

@@ -162,6 +162,8 @@ Detect project stage from context and adjust:
 
 ### Step 2: Gather Candidates
 
+**ultrathink:** Apply comprehensive reasoning to analyze all candidates, evaluate tradeoffs, and create an optimal execution plan.
+
 **Default: Fetch from ALL tracked repos**
 
 If running via `claw`:

@@ -269,6 +269,27 @@ claw stores data in `~/.claw/`:
 
 Each repo in a project gets a `.claw/project.json` marker for auto-detection.
 
+### Extended Thinking (Recommended)
+
+Enable extended thinking for better planning and decision-making quality:
+
+```bash
+# Add to ~/.bashrc or ~/.zshrc
+export MAX_THINKING_TOKENS=31999
+```
+
+This enables comprehensive reasoning during:
+- `/plan-day` - Daily work prioritization
+- `/brainstorm` - Multi-agent planning
+- `/auto-pilot` - Autonomous execution planning
+- Complex architectural decisions
+
+**Benefits**: Deeper analysis, better edge case identification, more thorough risk assessment.
+
+**Cost**: You are charged for thinking tokens used (shown in Claude Code output).
+
+Alternatively, toggle thinking mode per-session with `Option+T` (macOS) or `Alt+T` (Windows/Linux).
+
 ## Requirements
 
 - [Claude Code CLI](https://claude.ai/code) (`claude`)

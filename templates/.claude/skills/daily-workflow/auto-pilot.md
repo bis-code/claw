@@ -148,6 +148,8 @@ Unit tests only"
 
 ## Phase 2: Aggregate & Prioritize
 
+**ultrathink:** Apply comprehensive reasoning to analyze all discovered and existing issues, evaluate dependencies, and create an optimal execution strategy.
+
 **This phase happens IMMEDIATELY after discovery** (unless `--discover-only`).
 
 After discovery, the orchestrator:
