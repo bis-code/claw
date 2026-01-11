@@ -2,25 +2,69 @@
 
 A powerful wrapper for Claude Code that adds project management, multi-repo support, and autonomous development workflows.
 
+> **📦 Local Development Only**
+> This project has no published releases or package manager distribution.
+> Clone the repository and add to your PATH to get the latest version directly from source.
+
 ## Installation (Local Setup)
 
-**Note:** This project is for local development only. Clone and build locally instead of using package managers.
+### Initial Setup
 
 ```bash
-# Clone the repository
-git clone https://github.com/bis-code/claw.git
-cd claw
+# Clone the repository to a permanent location
+git clone https://github.com/bis-code/claw.git ~/claw
+cd ~/claw
 
-# Add to your PATH (choose one method)
+# Add to your PATH - choose one method:
 
-# Option 1: Symlink to /usr/local/bin
-sudo ln -s "$(pwd)/bin/claw" /usr/local/bin/claw
+# Option 1: Symlink to /usr/local/bin (recommended - easy updates)
+sudo ln -sf "$(pwd)/bin/claw" /usr/local/bin/claw
 
-# Option 2: Add to PATH in your shell config (~/.zshrc or ~/.bashrc)
-export PATH="$PATH:/path/to/claw/bin"
+# Option 2: Add to your shell config (~/.zshrc or ~/.bashrc)
+echo 'export PATH="$HOME/claw/bin:$PATH"' >> ~/.zshrc  # or ~/.bashrc
+source ~/.zshrc  # or source ~/.bashrc
 
 # Verify installation
 claw --version
+```
+
+### Updating to Latest Version
+
+```bash
+# Navigate to your claw directory
+cd ~/claw
+
+# Pull latest changes from main branch
+git pull origin main
+
+# Or pull from develop for cutting-edge features
+git checkout develop && git pull origin develop
+
+# No rebuild needed - it's a shell script!
+claw --version  # Verify new version
+```
+
+### Development / Contributing
+
+```bash
+cd ~/claw
+
+# Work on develop branch
+git checkout develop
+git pull origin develop
+
+# Make your changes to:
+# - bin/claw          (main script)
+# - lib/*             (library functions)
+# - templates/.claude/* (Claude Code templates)
+
+# Test your changes
+./bin/claw --help
+
+# When ready, commit
+git add .
+git commit -m "your changes"
+git push origin develop
 ```
 
 ## Quick Start
