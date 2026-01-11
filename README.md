@@ -91,13 +91,43 @@ claw "fix the bug"        # Start with prompt
 claw --continue           # Continue last session
 ```
 
+## Command Reference
+
+Quick reference for daily usage:
+
+| Command | When to Use | What It Does |
+|---------|-------------|--------------|
+| `claw` | Start session | Opens Claude Code with claw config |
+| `/auto` | Do everything | Discover, plan, execute, ship (autopilot) |
+| `/auto --plan-only` | Just plan | See what needs doing without executing |
+| `/plan-day` | Plan manually | Same as `/auto --plan-only` |
+| `/next` | Manual workflow | Pick up next issue from plan |
+| `/done` | After completing issue | Create PR, mark done |
+| `/ship-day` | End of day | Squash, create final PR, close issues |
+| `/pivot` | Priorities change | Document change, adjust plan |
+| `claw --update` | After git pull | Sync configuration (or automatic via hook) |
+
+**Recommended workflow:**
+```bash
+# Morning
+claw
+/auto --hours 6  # Autonomous: discovers, plans, executes, ships
+
+# Or manual control
+/plan-day --hours 6  # Just plan
+/next                # Pick up each issue
+/done                # Complete each issue
+/ship-day            # Ship at end of day
+```
+
 ## Features
 
 | Feature | Description |
 |---------|-------------|
 | **Project Management** | Group multiple repos into projects |
 | **Multi-Repo Issues** | Aggregate GitHub issues across all project repos |
-| **Daily Workflow** | `/plan-day`, `/ship-day`, `/brainstorm` commands |
+| **Daily Workflow** | `/auto`, `/plan-day`, `/ship-day`, `/next`, `/done` commands |
+| **Iteration Loop** | Test-until-green approach - keeps trying until tests pass |
 | **Autonomous Self-Improvement** | Daily automated code quality improvements with PR creation |
 | **Templates** | Install GitHub issue templates via API |
 | **Auto-Detection** | Knows which project you're in from any subdirectory |

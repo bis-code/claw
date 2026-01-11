@@ -1,5 +1,14 @@
 # Quick Token Optimization Fixes
 
+> **✅ IMPLEMENTED:** These optimizations are now built into `/auto` with three modes:
+> - `--discovery shallow` (~55k tokens)
+> - `--discovery balanced` (~120k tokens) - Default
+> - `--discovery deep` (~450k tokens)
+>
+> This document is kept for reference showing the optimization journey.
+
+---
+
 Your `/auto` was using **450k tokens** for discovery + brainstorm. Here's how to reduce it to **~60k tokens (85% reduction)** with 5 simple changes.
 
 ---
