@@ -9,7 +9,7 @@
 set -euo pipefail
 
 # x-release-please-start-version
-VERSION="1.4.1"
+VERSION="1.6.0"
 # x-release-please-end
 
 # ============================================================================
@@ -63,7 +63,21 @@ ensure_setup() {
     ensure_leann_setup || true  # Don't fail claw if leann setup fails
 }
 
+check_for_updates() {
+    # Check if configuration is outdated
+    local installed_version
+    installed_version=$(cat "$CLAW_HOME/.installed-version" 2>/dev/null || echo "0.0.0")
+
+    if [[ "$VERSION" != "$installed_version" ]]; then
+        echo ""
+        echo -e "${YELLOW}📦 New claw version available: ${BOLD}v${VERSION}${NC} (you have: ${installed_version})"
+        echo -e "${GRAY}   Run '${BOLD}claw --update${GRAY}' to sync latest templates${NC}"
+        echo ""
+    fi
+}
+
 install_global_claude_config() {
+    local force_update="${1:-false}"  # Pass "true" to force overwrite existing files
     local script_dir
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -83,10 +97,19 @@ install_global_claude_config() {
     fi
 
     echo ""
-    echo -e "${CYAN}✶${NC} ${BOLD}Installing Claude Code configuration${NC}"
+    if [[ "$force_update" == "true" ]]; then
+        echo -e "${CYAN}✶${NC} ${BOLD}Updating Claude Code configuration${NC}"
+        # Make all existing files writable for update
+        if [[ -d "$CLAUDE_HOME" ]]; then
+            chmod -R u+w "$CLAUDE_HOME" 2>/dev/null || true
+        fi
+    else
+        echo -e "${CYAN}✶${NC} ${BOLD}Installing Claude Code configuration${NC}"
+    fi
     echo ""
 
     local installed=0
+    local updated=0
 
     # Commands
     if [[ -d "$claude_templates_dir/commands" ]]; then
@@ -95,14 +118,19 @@ install_global_claude_config() {
         for file in "$claude_templates_dir/commands"/*.md; do
             [[ -f "$file" ]] || continue
             local name=$(basename "$file")
-            if [[ ! -f "$CLAUDE_HOME/commands/$name" ]]; then
+            if [[ "$force_update" == "true" ]] || [[ ! -f "$CLAUDE_HOME/commands/$name" ]]; then
                 cp "$file" "$CLAUDE_HOME/commands/$name"
                 count=$((count + 1))
             fi
         done
         if [[ $count -gt 0 ]]; then
-            echo -e "  ${GREEN}✓${NC} Commands (${count} installed)"
-            installed=$((installed + 1))
+            if [[ "$force_update" == "true" ]]; then
+                echo -e "  ${GREEN}✓${NC} Commands (${count} updated)"
+                updated=$((updated + 1))
+            else
+                echo -e "  ${GREEN}✓${NC} Commands (${count} installed)"
+                installed=$((installed + 1))
+            fi
         fi
     fi
 
@@ -113,14 +141,20 @@ install_global_claude_config() {
         for skill_dir in "$claude_templates_dir/skills"/*; do
             [[ -d "$skill_dir" ]] || continue
             local skill_name=$(basename "$skill_dir")
-            if [[ ! -d "$CLAUDE_HOME/skills/$skill_name" ]]; then
+            if [[ "$force_update" == "true" ]] || [[ ! -d "$CLAUDE_HOME/skills/$skill_name" ]]; then
+                rm -rf "$CLAUDE_HOME/skills/$skill_name"  # Remove existing if force update
                 cp -r "$skill_dir" "$CLAUDE_HOME/skills/$skill_name"
                 count=$((count + 1))
             fi
         done
         if [[ $count -gt 0 ]]; then
-            echo -e "  ${GREEN}✓${NC} Skills (${count} installed)"
-            installed=$((installed + 1))
+            if [[ "$force_update" == "true" ]]; then
+                echo -e "  ${GREEN}✓${NC} Skills (${count} updated)"
+                updated=$((updated + 1))
+            else
+                echo -e "  ${GREEN}✓${NC} Skills (${count} installed)"
+                installed=$((installed + 1))
+            fi
         fi
     fi
 
@@ -131,14 +165,19 @@ install_global_claude_config() {
         for file in "$claude_templates_dir/rules"/*.md; do
             [[ -f "$file" ]] || continue
             local name=$(basename "$file")
-            if [[ ! -f "$CLAUDE_HOME/rules/$name" ]]; then
+            if [[ "$force_update" == "true" ]] || [[ ! -f "$CLAUDE_HOME/rules/$name" ]]; then
                 cp "$file" "$CLAUDE_HOME/rules/$name"
                 count=$((count + 1))
             fi
         done
         if [[ $count -gt 0 ]]; then
-            echo -e "  ${GREEN}✓${NC} Rules (${count} installed)"
-            installed=$((installed + 1))
+            if [[ "$force_update" == "true" ]]; then
+                echo -e "  ${GREEN}✓${NC} Rules (${count} updated)"
+                updated=$((updated + 1))
+            else
+                echo -e "  ${GREEN}✓${NC} Rules (${count} installed)"
+                installed=$((installed + 1))
+            fi
         fi
     fi
 
@@ -149,14 +188,19 @@ install_global_claude_config() {
         for file in "$claude_templates_dir/agents"/*.md; do
             [[ -f "$file" ]] || continue
             local name=$(basename "$file")
-            if [[ ! -f "$CLAUDE_HOME/agents/$name" ]]; then
+            if [[ "$force_update" == "true" ]] || [[ ! -f "$CLAUDE_HOME/agents/$name" ]]; then
                 cp "$file" "$CLAUDE_HOME/agents/$name"
                 count=$((count + 1))
             fi
         done
         if [[ $count -gt 0 ]]; then
-            echo -e "  ${GREEN}✓${NC} Agents (${count} installed)"
-            installed=$((installed + 1))
+            if [[ "$force_update" == "true" ]]; then
+                echo -e "  ${GREEN}✓${NC} Agents (${count} updated)"
+                updated=$((updated + 1))
+            else
+                echo -e "  ${GREEN}✓${NC} Agents (${count} installed)"
+                installed=$((installed + 1))
+            fi
         fi
     fi
 
@@ -167,15 +211,20 @@ install_global_claude_config() {
         for file in "$claude_templates_dir/hooks"/*.sh; do
             [[ -f "$file" ]] || continue
             local name=$(basename "$file")
-            if [[ ! -f "$CLAUDE_HOME/hooks/$name" ]]; then
+            if [[ "$force_update" == "true" ]] || [[ ! -f "$CLAUDE_HOME/hooks/$name" ]]; then
                 cp "$file" "$CLAUDE_HOME/hooks/$name"
                 chmod +x "$CLAUDE_HOME/hooks/$name"
                 count=$((count + 1))
             fi
         done
         if [[ $count -gt 0 ]]; then
-            echo -e "  ${GREEN}✓${NC} Hooks (${count} installed)"
-            installed=$((installed + 1))
+            if [[ "$force_update" == "true" ]]; then
+                echo -e "  ${GREEN}✓${NC} Hooks (${count} updated)"
+                updated=$((updated + 1))
+            else
+                echo -e "  ${GREEN}✓${NC} Hooks (${count} installed)"
+                installed=$((installed + 1))
+            fi
         fi
     fi
 
@@ -186,14 +235,19 @@ install_global_claude_config() {
         for file in "$claude_templates_dir/checklists"/*.md; do
             [[ -f "$file" ]] || continue
             local name=$(basename "$file")
-            if [[ ! -f "$CLAUDE_HOME/checklists/$name" ]]; then
+            if [[ "$force_update" == "true" ]] || [[ ! -f "$CLAUDE_HOME/checklists/$name" ]]; then
                 cp "$file" "$CLAUDE_HOME/checklists/$name"
                 count=$((count + 1))
             fi
         done
         if [[ $count -gt 0 ]]; then
-            echo -e "  ${GREEN}✓${NC} Checklists (${count} installed)"
-            installed=$((installed + 1))
+            if [[ "$force_update" == "true" ]]; then
+                echo -e "  ${GREEN}✓${NC} Checklists (${count} updated)"
+                updated=$((updated + 1))
+            else
+                echo -e "  ${GREEN}✓${NC} Checklists (${count} installed)"
+                installed=$((installed + 1))
+            fi
         fi
     fi
 
@@ -204,29 +258,46 @@ install_global_claude_config() {
         for preset_dir in "$claude_templates_dir/presets"/*; do
             [[ -d "$preset_dir" ]] || continue
             local preset_name=$(basename "$preset_dir")
-            if [[ ! -d "$CLAUDE_HOME/presets/$preset_name" ]]; then
+            if [[ "$force_update" == "true" ]] || [[ ! -d "$CLAUDE_HOME/presets/$preset_name" ]]; then
+                rm -rf "$CLAUDE_HOME/presets/$preset_name"  # Remove existing if force update
                 cp -r "$preset_dir" "$CLAUDE_HOME/presets/$preset_name"
                 count=$((count + 1))
             fi
         done
         if [[ $count -gt 0 ]]; then
-            echo -e "  ${GREEN}✓${NC} Presets (${count} installed)"
-            installed=$((installed + 1))
+            if [[ "$force_update" == "true" ]]; then
+                echo -e "  ${GREEN}✓${NC} Presets (${count} updated)"
+                updated=$((updated + 1))
+            else
+                echo -e "  ${GREEN}✓${NC} Presets (${count} installed)"
+                installed=$((installed + 1))
+            fi
         fi
     fi
 
-    # Settings (only if doesn't exist)
+    # Settings (only if doesn't exist - never force update user settings)
     if [[ -f "$claude_templates_dir/settings.json" ]] && [[ ! -f "$CLAUDE_HOME/settings.json" ]]; then
         cp "$claude_templates_dir/settings.json" "$CLAUDE_HOME/settings.json"
         echo -e "  ${GREEN}✓${NC} Settings"
         installed=$((installed + 1))
     fi
 
+    # Track installed version
+    echo "$VERSION" > "$CLAW_HOME/.installed-version"
+
     echo ""
-    if [[ $installed -gt 0 ]]; then
-        echo -e "${GREEN}✓${NC} ${BOLD}Claude configuration ready!${NC}"
+    if [[ "$force_update" == "true" ]]; then
+        if [[ $updated -gt 0 ]]; then
+            echo -e "${GREEN}✓${NC} ${BOLD}Claude configuration updated to v${VERSION}!${NC}"
+        else
+            echo -e "${GRAY}→${NC} Claude configuration already up to date"
+        fi
     else
-        echo -e "${GRAY}→${NC} Claude configuration already installed"
+        if [[ $installed -gt 0 ]]; then
+            echo -e "${GREEN}✓${NC} ${BOLD}Claude configuration ready!${NC}"
+        else
+            echo -e "${GRAY}→${NC} Claude configuration already installed"
+        fi
     fi
     echo ""
 
@@ -450,10 +521,9 @@ EOF
             exit 0
             ;;
         --update)
-            # Force reinstall Claude configuration
+            # Force update Claude configuration (overwrite existing files)
             rm -f "$CLAW_HOME/.commands-installed"
-            ensure_setup
-            echo "Claude configuration updated (commands, skills, rules, agents, etc.)."
+            install_global_claude_config "true"  # Force update
             exit 0
             ;;
         --setup-leann)
@@ -490,6 +560,9 @@ EOF
 
     # Ensure claw is set up (silent, one-time)
     ensure_setup
+
+    # Check for configuration updates
+    check_for_updates
 
     # Check if claude is available
     if ! command -v claude &>/dev/null; then
