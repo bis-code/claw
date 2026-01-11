@@ -142,9 +142,10 @@ If you already know which mode you want:
 ### Advanced Usage
 
 ```bash
-/auto --hours 8                   # Extended work budget (8h human-equivalent)
-/auto --focus "billing"           # Focus discovery + execution on billing area
-/auto --discovery deep --hours 8  # Thorough scan with extended work budget
+/auto --hours 8                         # Extended work budget (8h human-equivalent)
+/auto --focus "billing"                 # Focus discovery + execution on billing area
+/auto --discovery deep --hours 8        # Thorough scan with extended work budget
+/auto --max-iterations-per-issue 10     # Allow up to 10 attempts per issue (default: 5)
 ```
 
 ### Key Distinctions
@@ -431,7 +432,7 @@ Output: Prioritized plan for today
 
 ## Phase 5: Execute
 
-The **Senior Developer Agent** takes over:
+The **Senior Developer Agent** takes over with **iteration-until-green** approach:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -439,11 +440,22 @@ The **Senior Developer Agent** takes over:
 │                                                                  │
 │  1. Read issue details                                          │
 │  2. Analyze codebase context                                    │
-│  3. Write tests first (TDD)                                     │
-│  4. Implement solution                                          │
-│  5. Run tests, fix failures                                     │
-│  6. Commit with issue reference                                 │
-│  7. Mark issue done, move to next                               │
+│  3. Generate completion criteria checklist                      │
+│  4. ITERATION LOOP (max 5 attempts by default):                 │
+│     a. Write tests first (TDD)                                  │
+│     b. Implement solution                                       │
+│     c. Run full test suite                                      │
+│     d. Check linter (if applicable)                             │
+│     e. IF all tests pass AND no lint errors:                    │
+│        → Exit loop (SUCCESS)                                    │
+│     f. ELSE:                                                    │
+│        → Analyze failures                                       │
+│        → Check for stuck conditions                             │
+│        → If stuck: log blocker, exit loop (STUCK)               │
+│        → Otherwise: iteration++, continue loop                  │
+│  5. Commit with issue reference (only if SUCCESS)               │
+│  6. Mark issue done or blocked                                  │
+│  7. Move to next issue                                          │
 │                                                                  │
 │  The QA Agent validates after each issue:                       │
 │  - Tests actually cover the changes                             │
@@ -452,24 +464,85 @@ The **Senior Developer Agent** takes over:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Execution Loop
+### Execution Loop (Iteration-Until-Green)
+
+**Key Innovation:** Ralph Wiggum-inspired persistence - don't settle for "good enough", iterate until truly done.
 
 ```
 while issues_remaining and time_remaining:
     issue = pick_next_issue()
+    iteration = 0
+    max_iterations = 5  # Configurable via --max-iterations-per-issue
+    stuck = false
+    last_error = null
+    error_count = {}
 
-    # Senior Dev implements
-    senior_dev.implement(issue)
+    # Initialize completion criteria
+    completion_criteria = generate_criteria(issue)
 
-    # QA validates
-    qa_result = qa.validate(issue)
+    # Iteration loop - keep trying until success or stuck
+    while iteration < max_iterations and not stuck:
+        iteration++
 
-    if qa_result.needs_work:
-        senior_dev.fix(qa_result.feedback)
+        # Senior Dev implements/fixes
+        senior_dev.work(issue, iteration)
 
-    commit(issue)
-    mark_done(issue)
+        # Run tests
+        test_result = run_tests()
+        lint_result = run_linter()
+
+        # Check for success
+        if test_result.all_pass and lint_result.no_errors:
+            log_iteration_success(issue, iteration)
+            commit(issue)
+            mark_done(issue)
+            break  # Exit iteration loop - SUCCESS
+
+        # Analyze failure
+        current_error = extract_error(test_result, lint_result)
+
+        # Stuck detection (same error 3 times)
+        if error_count[current_error]:
+            error_count[current_error]++
+            if error_count[current_error] >= 3:
+                stuck = true
+                log_stuck(issue, current_error, "Same error 3 times")
+                mark_blocked(issue, current_error)
+                break  # Exit iteration loop - STUCK
+        else:
+            error_count[current_error] = 1
+
+        # Stuck detection (no file changes)
+        if iteration > 1 and no_files_changed():
+            stuck = true
+            log_stuck(issue, current_error, "No file changes")
+            mark_blocked(issue, "No progress - files unchanged")
+            break  # Exit iteration loop - STUCK
+
+        # Log iteration failure
+        log_iteration_failure(issue, iteration, current_error)
+
+        # If max iterations reached
+        if iteration >= max_iterations:
+            log_max_iterations(issue, max_iterations)
+            mark_blocked(issue, "Max iterations reached")
+            break  # Exit iteration loop - MAX ITERATIONS
+
+    # Move to next issue
+    next_issue()
 ```
+
+### Stuck Detection Rules
+
+To prevent token waste on impossible issues:
+
+| Condition | Threshold | Action |
+|-----------|-----------|--------|
+| **Same error repeated** | 3 times | Mark STUCK, log blocker, move on |
+| **No file changes** | 2 iterations | Mark STUCK, log "no progress", move on |
+| **Max iterations** | 5 (default) | Mark BLOCKED, log attempts, move on |
+
+**Philosophy:** It's better to identify blockers quickly and move to productive work than to waste tokens on impossible issues.
 
 ### Interruption Handling
 
@@ -517,6 +590,30 @@ Invokes `/ship-day`:
 - Budget represents **work output** (human-equivalent hours), not wall-clock time
 - Claude stops when the work budget is exhausted, then auto-ships
 - Actual wall-clock time varies based on test suite speed and external processes
+
+### Max Iterations Per Issue (Default: 5)
+
+```bash
+/auto --max-iterations-per-issue 5    # Default: conservative cost control
+/auto --max-iterations-per-issue 10   # For complex issues
+/auto --max-iterations-per-issue 3    # For well-understood codebases
+```
+
+**How it works:**
+- Each issue gets up to N attempts to pass all tests
+- Prevents runaway token costs on impossible issues
+- Combines with stuck detection (same error 3x, no file changes)
+- Failed issues are marked as BLOCKED with blocker details logged
+
+**When to increase:**
+- Complex refactors (10-15 iterations)
+- New codebases with unfamiliar patterns
+- Issues involving external dependencies
+
+**When to decrease:**
+- Well-tested, familiar codebase (3 iterations often enough)
+- Token budget constraints
+- Quick daily maintenance work
 
 ### Focus Area (Optional)
 
@@ -625,28 +722,72 @@ At the end of `/auto`, generate a report:
 - Work completed: 4 hours (human-equivalent)
 - Issues discovered: 7
 - Issues completed: 4
-- Issues deferred: 1
+- Issues blocked: 1
+- Issues deferred: 0
 - PR created: #123
 
+## Execution Statistics
+- Total iterations: 12 (avg 3.0 per completed issue)
+- First-try successes: 1 (25%)
+- Required retries: 3 (75%)
+- Stuck/blocked: 1 (max iterations reached)
+
 ## Discoveries
-| Issue | Type | Source | Status |
-|-------|------|--------|--------|
-| #51 | TODO | pipeline.go:142 | Completed |
-| #52 | Test Gap | billing_handler.go | Completed |
-| #53 | Tech Debt | stripe.go | Deferred |
-| #54 | Security | auth.go | Completed |
+| Issue | Type | Source | Status | Iterations |
+|-------|------|--------|--------|-----------|
+| #51 | TODO | pipeline.go:142 | Completed ✅ | 2/5 |
+| #52 | Test Gap | billing_handler.go | Completed ✅ | 1/5 |
+| #53 | Security | auth.go | Completed ✅ | 4/5 |
+| #54 | Tech Debt | stripe.go | Blocked 🚫 | 5/5 (STUCK) |
+
+### Detailed Execution Log
+
+#### Issue #51: Add retry logic to pipeline ✅
+- **Iterations:** 2/5
+- **Exit reason:** All tests passing
+- **Iteration breakdown:**
+  1. Initial implementation → Tests failed (missing error handling)
+  2. Added error handling → ✅ All tests passing
+
+#### Issue #52: Test coverage for billing_handler ✅
+- **Iterations:** 1/5
+- **Exit reason:** All tests passing (first try!)
+- **Iteration breakdown:**
+  1. Implemented tests → ✅ All tests passing
+
+#### Issue #53: Fix auth token vulnerability ✅
+- **Iterations:** 4/5
+- **Exit reason:** All tests passing
+- **Iteration breakdown:**
+  1. Initial fix → Tests failed (missing validation)
+  2. Added validation → Tests failed (edge case with expired tokens)
+  3. Fixed expiry handling → Tests failed (race condition)
+  4. Added locking → ✅ All tests passing
+
+#### Issue #54: Tech debt in stripe.go 🚫 BLOCKED
+- **Iterations:** 5/5
+- **Exit reason:** Max iterations reached
+- **Blocker:** External Stripe API returning 404 on webhook endpoint
+- **Needs human:** Verify Stripe webhook configuration in dashboard
+- **Iteration breakdown:**
+  1. Refactored Stripe client → Tests failed (404 on webhook)
+  2. Updated endpoint URL → Tests failed (same 404)
+  3. Added debug logging → Tests failed (404 persists)
+  4. Checked Stripe config → Tests failed (404 persists)
+  5. Max iterations → Gave up
 
 ## Agent Activity
 
 ### Senior Developer
 - Implemented 4 issues
 - 847 lines added, 123 removed
+- Average iterations per issue: 3.0
 - Average work per issue: 1h human-equivalent
 
 ### QA Engineer
 - Validated 4 implementations
-- Requested fixes on 2
-- All tests passing
+- Identified 8 edge cases during iteration
+- All completed issues have green tests
 
 ### Discovery Agents
 - TODOs found: 12 (7 significant)
@@ -654,12 +795,15 @@ At the end of `/auto`, generate a report:
 - Security issues: 1 (fixed)
 
 ## Insights
+- **Iteration patterns:** Most issues resolved in 2-4 attempts
+- **Stuck issue:** #54 blocked by external dependency (Stripe config)
+- **First-try success:** Only 25% succeeded without iteration (normal)
+- **Value of iteration:** 75% of issues needed refinement to pass tests
 - Billing area has most tech debt (3 issues)
-- Pipeline code needs retry logic (created #51)
-- Auth token handling was vulnerable (fixed in #54)
+- Auth token handling was vulnerable (fixed in #54 after 4 iterations)
 
 ## Tomorrow's Candidates
-- #53: Tech debt in stripe.go
+- #54: Tech debt in stripe.go (UNBLOCK: Check Stripe webhook config)
 - #55: Test coverage for webhooks
 - #56: TODO in scheduler
 ```
