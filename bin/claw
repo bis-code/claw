@@ -498,12 +498,13 @@ Available Skills (use inside Claude session with /):
     /ship-day                   End of day: create PR, close issues
 
   Autonomous:
-    /auto-pilot --hours N       Full autonomous mode (discover, plan, execute, ship)
+    /auto --hours N             One command: discover, plan, execute, ship
+                                --plan-only: stop after planning
+                                --discovery: shallow|balanced|deep
+                                --max-iterations-per-issue N (default: 5)
     /self-improve --hours N     Autonomous code quality improvements
-    /autonomous                 Execute tasks from queue with TDD
 
   Analysis:
-    /brainstorm                 Multi-agent collaborative planning
     /search <query>             Efficient codebase search
     /index [--update]           Generate/update project index
 
