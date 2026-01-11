@@ -1,0 +1,54 @@
+#!/bin/bash
+# post-merge - Git hook that auto-syncs claw configuration after git pull
+# Automatically installed by setup.sh
+
+set -euo pipefail
+
+# Colors
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+BOLD='\033[1m'
+
+# Get repo root
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+CLAW_BIN="$REPO_ROOT/bin/claw"
+
+# Check if claw binary or templates changed
+CHANGED_FILES=$(git diff-tree -r --name-only --no-commit-id ORIG_HEAD HEAD)
+
+needs_update=false
+if echo "$CHANGED_FILES" | grep -q "^bin/claw"; then
+    needs_update=true
+    echo ""
+    echo -e "${CYAN}📦 claw binary updated${NC}"
+fi
+
+if echo "$CHANGED_FILES" | grep -q "^templates/"; then
+    needs_update=true
+    echo ""
+    echo -e "${CYAN}📦 Claude Code templates updated${NC}"
+fi
+
+if echo "$CHANGED_FILES" | grep -q "^hooks/post-merge"; then
+    echo ""
+    echo -e "${YELLOW}⚠ Git hook updated - reinstalling...${NC}"
+    cp "$REPO_ROOT/hooks/post-merge" "$REPO_ROOT/.git/hooks/post-merge"
+    chmod +x "$REPO_ROOT/.git/hooks/post-merge"
+    echo -e "${GREEN}✓ Git hook reinstalled${NC}"
+fi
+
+if [[ "$needs_update" == true ]]; then
+    echo -e "${CYAN}→ Auto-syncing configuration...${NC}"
+    echo ""
+
+    if [[ -x "$CLAW_BIN" ]]; then
+        "$CLAW_BIN" --update
+        echo ""
+        echo -e "${GREEN}✓ Configuration synced automatically!${NC}"
+    else
+        echo -e "${YELLOW}⚠ claw binary not executable - run setup.sh${NC}"
+    fi
+    echo ""
+fi

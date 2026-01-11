@@ -10,49 +10,53 @@ A powerful wrapper for Claude Code that adds project management, multi-repo supp
 
 ### Initial Setup
 
+**One-time setup** (installs symlink + auto-sync):
+
 ```bash
 # Clone the repository to a permanent location
 git clone https://github.com/bis-code/claw.git ~/claw
 cd ~/claw
 
-# Add to your PATH - choose one method:
-
-# Option 1: Symlink to /usr/local/bin (recommended - easy updates)
-sudo ln -sf "$(pwd)/bin/claw" /usr/local/bin/claw
-
-# Option 2: Add to your shell config (~/.zshrc or ~/.bashrc)
-echo 'export PATH="$HOME/claw/bin:$PATH"' >> ~/.zshrc  # or ~/.bashrc
-source ~/.zshrc  # or source ~/.bashrc
+# Run setup script (creates symlink, installs git hook, syncs config)
+./setup.sh
 
 # Verify installation
 claw --version
 ```
 
+**What `setup.sh` does:**
+1. Creates symlink: `/usr/local/bin/claw` → `~/claw/bin/claw`
+2. Installs git post-merge hook (auto-syncs after `git pull`)
+3. Runs initial `claw --update` to sync templates
+
+**After setup, you can use `claw` from anywhere!**
+
 ### Updating to Latest Version
 
-**Automatic update detection**: claw checks for new versions on startup and notifies you when updates are available.
+**Fully automatic** (if you ran `setup.sh`):
 
 ```bash
-# Step 1: Pull latest code
 cd ~/claw
 git pull origin main
 
-# Step 2: Update Claude Code configuration (skills, rules, commands, etc.)
-claw --update
-
-# That's it! Configuration is now in sync with latest templates
+# That's it! The git hook auto-syncs configuration for you
 ```
 
-**What `claw --update` does:**
-- Overwrites all Claude Code templates (skills, rules, commands) with latest versions
-- Preserves your custom settings and hooks
-- Tracks installed version for future update detection
+**What happens automatically:**
+1. Git post-merge hook detects if `bin/claw` or `templates/` changed
+2. If yes, runs `claw --update` automatically
+3. Configuration synced with latest templates - no manual step needed!
+
+**Manual sync** (if needed):
+```bash
+claw --update  # Forces configuration sync
+```
 
 **For cutting-edge features:**
 ```bash
 cd ~/claw
 git checkout develop && git pull origin develop
-claw --update
+# Auto-syncs via git hook
 ```
 
 ### Development / Contributing
