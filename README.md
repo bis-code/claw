@@ -30,18 +30,29 @@ claw --version
 
 ### Updating to Latest Version
 
-```bash
-# Navigate to your claw directory
-cd ~/claw
+**Automatic update detection**: claw checks for new versions on startup and notifies you when updates are available.
 
-# Pull latest changes from main branch
+```bash
+# Step 1: Pull latest code
+cd ~/claw
 git pull origin main
 
-# Or pull from develop for cutting-edge features
-git checkout develop && git pull origin develop
+# Step 2: Update Claude Code configuration (skills, rules, commands, etc.)
+claw --update
 
-# No rebuild needed - it's a shell script!
-claw --version  # Verify new version
+# That's it! Configuration is now in sync with latest templates
+```
+
+**What `claw --update` does:**
+- Overwrites all Claude Code templates (skills, rules, commands) with latest versions
+- Preserves your custom settings and hooks
+- Tracks installed version for future update detection
+
+**For cutting-edge features:**
+```bash
+cd ~/claw
+git checkout develop && git pull origin develop
+claw --update
 ```
 
 ### Development / Contributing
