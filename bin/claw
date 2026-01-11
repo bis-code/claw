@@ -289,6 +289,7 @@ install_global_claude_config() {
     fi
 
     # Track installed version
+    mkdir -p "$CLAW_HOME"
     echo "$VERSION" > "$CLAW_HOME/.installed-version"
 
     echo ""
