@@ -20,7 +20,14 @@ CLAW_HOME="${CLAW_HOME:-$HOME/.claw}"
 CLAUDE_HOME="${CLAUDE_HOME:-$HOME/.claude}"
 
 # Source modules
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve symlinks to get the actual script location
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+    DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+    SOURCE="$(readlink "$SOURCE")"
+    [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 LIB_DIR="${SCRIPT_DIR}/../lib"
 source "${LIB_DIR}/leann-mcp.sh"
 source "${LIB_DIR}/issue-templates.sh"
@@ -78,21 +85,20 @@ check_for_updates() {
 
 install_global_claude_config() {
     local force_update="${1:-false}"  # Pass "true" to force overwrite existing files
-    local script_dir
-    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+    # Use SCRIPT_DIR that's already resolved at top of file (handles symlinks)
     # Check both possible template locations (development vs Homebrew)
     local claude_templates_dir
     if [[ -d "${LIB_DIR}/templates/.claude" ]]; then
         # Homebrew installation
         claude_templates_dir="${LIB_DIR}/templates/.claude"
-    elif [[ -d "${script_dir}/../templates/.claude" ]]; then
+    elif [[ -d "${SCRIPT_DIR}/../templates/.claude" ]]; then
         # Development/source installation
-        claude_templates_dir="${script_dir}/../templates/.claude"
+        claude_templates_dir="${SCRIPT_DIR}/../templates/.claude"
     else
         echo "Warning: Claude templates directory not found"
         echo "  Tried: ${LIB_DIR}/templates/.claude"
-        echo "  Tried: ${script_dir}/../templates/.claude"
+        echo "  Tried: ${SCRIPT_DIR}/../templates/.claude"
         return 1
     fi
 
