@@ -391,6 +391,7 @@ Create state file: `~/.claw/daily/YYYY-MM-DD.md`
 hours_available: 4
 maturity: startup
 branch_strategy: pr-per-issue
+max_iterations_per_issue: 5
 started: 09:00
 
 ## Lens Settings
@@ -405,6 +406,8 @@ started: 09:00
   - Status: in-progress
   - Branch: issue/53-settings-display
   - Started: 09:15
+  - Iteration: 2/5
+  - Last error: TypeError: Cannot read property 'theme' of undefined
 
 ### Queued
 - [ ] #52 - Provider error (~1.5h)
@@ -414,12 +417,30 @@ started: 09:00
 - [x] #53 - Settings display
   - PR: #15 (https://github.com/owner/repo/pull/15)
   - Completed: 10:30
+  - Iterations: 3/5 (passed on 3rd attempt)
+  - Iteration log:
+    1. Initial implementation → Tests failed (missing validation)
+    2. Added validation → Tests failed (edge case)
+    3. Fixed edge case → ✅ All tests passing
 - [x] #52 - Provider error
   - PR: #16 (https://github.com/owner/repo/pull/16)
   - Completed: 12:15
+  - Iterations: 1/5 (first-try success!)
+
+### Blocked
+- [ ] #58 - API encryption
+  - Status: STUCK (5/5 iterations)
+  - Blocker: External API endpoint returning 404
+  - Needs human: Verify API configuration in dashboard
+  - Iteration log:
+    1. Initial implementation → API 404
+    2. Updated endpoint → API 404 (same error)
+    3. Added auth header → API 404 (same error)
+    4. Checked API docs → API 404 (same error - STUCK)
+    5. Max iterations → Gave up
 
 ### Deferred
-- #58 - API encryption (revisit tomorrow)
+- #59 - Performance optimization (low priority, revisit tomorrow)
 
 ## PR Merge Order
 

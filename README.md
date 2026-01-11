@@ -141,8 +141,14 @@ All commands are available inside any Claude session started with `claw`. Use th
 
 | Command | Flags | Description |
 |---------|-------|-------------|
-| `/auto` | `--hours N` (default: 4)<br>`--focus "area"`<br>`--discovery [deep\|shallow\|none]`<br>`--plan-only`<br>`--skip-discovery` | **One command to rule them all**<br>Full autonomous mode: discover work, plan, execute, ship<br>Use `--plan-only` to stop after planning |
+| `/auto` | `--hours N` (default: 4)<br>`--focus "area"`<br>`--discovery [deep\|shallow\|none]`<br>`--plan-only`<br>`--skip-discovery`<br>`--max-iterations-per-issue N` (default: 5) | **One command to rule them all**<br>Full autonomous mode: discover work, plan, execute, ship<br>**NEW:** Iteration-until-green approach - keeps trying until tests pass<br>Use `--plan-only` to stop after planning |
 | `/self-improve` | `--hours N` (default: 2)<br>`--focus "area"`<br>`--dry-run`<br>`--max-commits N` (default: 20) | Autonomous code quality improvements<br>Discovers issues, researches best practices, creates PR |
+
+**NEW: Iteration Loop** - `/auto` now includes Ralph Wiggum-inspired persistence:
+- Each issue gets up to 5 attempts (configurable) to pass all tests
+- Automatic stuck detection (same error 3x, no file changes)
+- Transparent tracking in daily files and reports
+- See [`docs/ITERATION_LOOP.md`](docs/ITERATION_LOOP.md) for details
 
 ### Analysis & Planning
 
