@@ -112,6 +112,7 @@ program
     const { Workspace } = await import('../core/workspace.js');
     const { FeatureManager } = await import('../core/feature.js');
     const { BreakdownGenerator } = await import('../core/breakdown.js');
+    const { StoryRefiner } = await import('../core/refinement.js');
     const { DiscoveryEngine } = await import('../core/discovery.js');
     const inquirer = await import('inquirer');
     const ora = (await import('ora')).default;
@@ -186,9 +187,31 @@ program
       const selectedApproach = approaches[approachIndex >= 0 ? approachIndex : 0];
       console.log(chalk.green(`\n✓ Selected: ${selectedApproach.name}\n`));
 
-      // Show stories
-      console.log(chalk.blue('Stories:'));
-      for (const story of selectedApproach.stories) {
+      // Refine stories interactively
+      const refiner = new StoryRefiner();
+      const { refineInteractively } = await inquirer.default.prompt([{
+        type: 'confirm',
+        name: 'refineInteractively',
+        message: 'Refine stories interactively? (modify scope, split, skip)',
+        default: false,
+      }]);
+
+      let refinedStories = selectedApproach.stories;
+      if (refineInteractively) {
+        refinedStories = await refiner.refineStories(selectedApproach.stories);
+      } else {
+        // Quick refinement - show all and accept
+        refinedStories = await refiner.quickRefine(selectedApproach.stories);
+      }
+
+      if (refinedStories.length === 0) {
+        console.log(chalk.yellow('\n⚠️  All stories skipped. Aborting feature creation.'));
+        return;
+      }
+
+      // Show final stories
+      console.log(chalk.blue('\n📋 Final Stories:'));
+      for (const story of refinedStories) {
         console.log(`  ${chalk.dim('•')} ${story.title} (${story.estimatedHours}h)`);
         if (story.dependsOn && story.dependsOn.length > 0) {
           console.log(chalk.dim(`      Depends on: ${story.dependsOn.join(', ')}`));

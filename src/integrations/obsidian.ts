@@ -230,4 +230,26 @@ export class ObsidianClient {
   getVaultPath(): string {
     return this.vaultPath;
   }
+
+  /**
+   * Append content to an existing note
+   */
+  async appendToNote(path: string, content: string): Promise<void> {
+    const note = await this.readNote(path);
+    if (!note) {
+      throw new Error(`Note not found: ${path}`);
+    }
+
+    const newContent = note.content + content;
+    await this.writeNote(path, newContent, note.frontmatter);
+  }
+
+  /**
+   * Delete a note from the vault
+   */
+  async deleteNote(path: string): Promise<void> {
+    const fullPath = this.getFullPath(path);
+    const { unlink } = await import('fs/promises');
+    await unlink(fullPath);
+  }
 }

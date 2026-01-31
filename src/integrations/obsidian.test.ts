@@ -1,32 +1,121 @@
-// Quick integration test for Obsidian client
+// Test Obsidian client
 import { ObsidianClient } from './obsidian.js';
+import fs from 'fs/promises';
+import path from 'path';
+import os from 'os';
 
-async function test() {
-  const client = new ObsidianClient('~/Documents/Obsidian');
+describe('ObsidianClient', () => {
+  let client: ObsidianClient;
+  let testDir: string;
 
-  // Test read
-  console.log('Testing read...');
-  const note = await client.readNote('Projects/claw/2026-01-31-v2-orchestration-tool/_overview');
-  if (note) {
-    console.log(`✓ Read note: ${note.path}`);
-    console.log(`  Content length: ${note.content.length} chars`);
-  } else {
-    console.log('✗ Failed to read note');
-  }
+  beforeAll(async () => {
+    // Create a temporary test directory
+    testDir = path.join(os.tmpdir(), `obsidian-test-${Date.now()}`);
+    await fs.mkdir(testDir, { recursive: true });
+    client = new ObsidianClient(testDir);
+  });
 
-  // Test list directory
-  console.log('\nTesting list directory...');
-  const { dirs, files } = await client.listDirectory('Projects/claw');
-  console.log(`✓ Found ${dirs.length} dirs, ${files.length} files`);
-  console.log(`  Dirs: ${dirs.join(', ')}`);
-  console.log(`  Files: ${files.join(', ')}`);
+  afterAll(async () => {
+    // Clean up test directory
+    try {
+      await fs.rm(testDir, { recursive: true, force: true });
+    } catch {
+      // Ignore cleanup errors
+    }
+  });
 
-  // Test exists
-  console.log('\nTesting exists...');
-  const exists = await client.exists('Projects/claw/2026-01-31-v2-orchestration-tool/_overview');
-  console.log(`✓ Exists check: ${exists}`);
+  describe('writeNote and readNote', () => {
+    it('should write and read a note', async () => {
+      const notePath = 'test/write-read-test';
+      const content = '# Test Note\n\nSome content here';
 
-  console.log('\n✓ All tests passed!');
-}
+      await client.writeNote(notePath, content);
+      const note = await client.readNote(notePath);
 
-test().catch(console.error);
+      expect(note).not.toBeNull();
+      expect(note?.content).toBe(content);
+      expect(note?.path).toBe(notePath);
+    });
+
+    it('should return null for non-existent note', async () => {
+      const note = await client.readNote('nonexistent/note');
+      expect(note).toBeNull();
+    });
+  });
+
+  describe('exists', () => {
+    it('should return true for existing note', async () => {
+      const notePath = 'test/exists-test';
+      await client.writeNote(notePath, 'content');
+
+      const exists = await client.exists(notePath);
+      expect(exists).toBe(true);
+    });
+
+    it('should return false for non-existent note', async () => {
+      const exists = await client.exists('nonexistent/note-xyz');
+      expect(exists).toBe(false);
+    });
+  });
+
+  describe('listDirectory', () => {
+    beforeAll(async () => {
+      // Create test structure
+      await client.writeNote('listtest/note1', 'content 1');
+      await client.writeNote('listtest/note2', 'content 2');
+      await client.writeNote('listtest/subdir/note3', 'content 3');
+    });
+
+    it('should list files and directories', async () => {
+      const result = await client.listDirectory('listtest');
+
+      expect(result.files).toContain('note1.md');
+      expect(result.files).toContain('note2.md');
+      expect(result.dirs).toContain('subdir');
+    });
+  });
+
+  describe('patchNote', () => {
+    it('should replace text in a note', async () => {
+      const notePath = 'test/patch-test';
+      await client.writeNote(notePath, '# Title\n\nOld text here\n\nMore content');
+
+      await client.patchNote(notePath, 'Old text here', 'New text here');
+
+      const note = await client.readNote(notePath);
+      expect(note?.content).toBe('# Title\n\nNew text here\n\nMore content');
+    });
+
+    it('should return false if old text not found', async () => {
+      const notePath = 'test/patch-fail-test';
+      await client.writeNote(notePath, '# Title\n\nSome content');
+
+      const result = await client.patchNote(notePath, 'Not found text', 'New text');
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('appendToNote', () => {
+    it('should append content to existing note', async () => {
+      const notePath = 'test/append-test';
+      await client.writeNote(notePath, 'Line 1');
+
+      await client.appendToNote(notePath, '\nLine 2');
+
+      const note = await client.readNote(notePath);
+      expect(note?.content).toBe('Line 1\nLine 2');
+    });
+  });
+
+  describe('deleteNote', () => {
+    it('should delete an existing note', async () => {
+      const notePath = 'test/delete-test';
+      await client.writeNote(notePath, 'to delete');
+
+      await client.deleteNote(notePath);
+
+      const exists = await client.exists(notePath);
+      expect(exists).toBe(false);
+    });
+  });
+});
