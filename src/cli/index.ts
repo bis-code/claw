@@ -285,5 +285,70 @@ program
     console.log(chalk.yellow('Not yet implemented - Epic 4, Story 4.2'));
   });
 
+// claw discover - Run discovery agents
+program
+  .command('discover')
+  .description('Run discovery agents to find work in the codebase')
+  .option('-m, --mode <mode>', 'Discovery mode: shallow, balanced, deep', 'balanced')
+  .option('-f, --focus <area>', 'Focus on specific area')
+  .action(async (options) => {
+    const { Workspace } = await import('../core/workspace.js');
+    const { DiscoveryEngine } = await import('../core/discovery.js');
+    const ora = (await import('ora')).default;
+
+    const workspace = new Workspace(process.cwd());
+    const config = await workspace.load();
+
+    if (!config) {
+      console.log(chalk.red('✗ Workspace not initialized. Run `claw init` first.'));
+      process.exit(1);
+    }
+
+    const engine = new DiscoveryEngine(process.cwd());
+
+    console.log(chalk.blue(`\n🔍 Running ${options.mode} discovery...\n`));
+
+    const spinner = ora('Scanning codebase...').start();
+
+    const results = await engine.runDiscovery({
+      mode: options.mode,
+      focus: options.focus,
+      repos: config.repos,
+    });
+
+    spinner.stop();
+
+    // Display results
+    let totalFindings = 0;
+    for (const result of results) {
+      if (result.findings.length === 0) continue;
+
+      console.log(chalk.bold(`\n${result.agent.toUpperCase()} (${result.findings.length} findings)`));
+
+      for (const finding of result.findings) {
+        const priorityColors: Record<string, typeof chalk.red> = {
+          P0: chalk.red,
+          P1: chalk.yellow,
+          P2: chalk.blue,
+          P3: chalk.dim,
+        };
+        const color = priorityColors[finding.priority] || chalk.white;
+
+        console.log(`  ${color(`[${finding.priority}]`)} ${finding.title}`);
+        if (finding.file) {
+          console.log(chalk.dim(`       ${finding.file}${finding.line ? `:${finding.line}` : ''}`));
+        }
+        totalFindings++;
+      }
+    }
+
+    if (totalFindings === 0) {
+      console.log(chalk.green('✓ No significant issues found!'));
+    } else {
+      console.log(chalk.dim(`\nTotal: ${totalFindings} findings`));
+      console.log(chalk.dim('Run `claw feature` to create stories from these findings.'));
+    }
+  });
+
 // Parse and run
 program.parse();
