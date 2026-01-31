@@ -1,19 +1,14 @@
 name: Claude Code
 
-# DISABLED - was costing money with Claude Code API usage
-# To re-enable, uncomment the "on:" section below
-# on:
-#   issue_comment:
-#     types: [created]
-#   pull_request_review_comment:
-#     types: [created]
-#   issues:
-#     types: [opened, assigned]
-#   pull_request_review:
-#     types: [submitted]
-
-# Manual trigger only
 on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+  pull_request_review:
+    types: [submitted]
   workflow_dispatch:
 
 jobs:
