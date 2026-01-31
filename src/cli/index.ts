@@ -262,6 +262,8 @@ program
   .option('--pause-between', 'Pause between stories for review')
   .option('--model <model>', 'Claude model to use (sonnet, opus, haiku)', 'sonnet')
   .option('-y, --yes', 'Skip permission prompts')
+  .option('--retry', 'Enable iteration-until-green mode (retry on failure)')
+  .option('--max-retries <n>', 'Max retries per story', '5')
   .action(async (featureId, options) => {
     const { Workspace } = await import('../core/workspace.js');
     const { FeatureManager } = await import('../core/feature.js');
@@ -314,6 +316,8 @@ program
       pauseBetweenStories: options.pauseBetween,
       model: options.model as 'sonnet' | 'opus' | 'haiku',
       dangerouslySkipPermissions: options.yes,
+      iterateUntilGreen: options.retry,
+      maxIterations: options.maxRetries ? parseInt(options.maxRetries, 10) : 5,
     });
 
     if (!result.success) {

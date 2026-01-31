@@ -9,6 +9,7 @@ export { DiscoveryEngine, type DiscoveryResult, type Finding, type DiscoveryMode
 export { BreakdownGenerator, type BreakdownApproach, type ProposedStory, type BreakdownContext } from './core/breakdown.js';
 export { StoryRefiner, type RefinementAction, type RefinementResult } from './core/refinement.js';
 export { DependencyManager, type DependencyNode, type DependencyGraph } from './core/dependencies.js';
+export { IterationEngine, type IterationConfig, type IterationState, type IterationResult, type StuckAnalysis } from './core/iteration.js';
 
 // Integrations
 export { ObsidianClient, type ObsidianNote } from './integrations/obsidian.js';

@@ -7,6 +7,7 @@ import { ClaudeClient, ClaudeOutput, SpawnOptions } from '../integrations/claude
 import { ObsidianClient } from '../integrations/obsidian.js';
 import { DependencyManager } from './dependencies.js';
 import { Feature, Story, FeatureManager } from './feature.js';
+import { IterationEngine, IterationResult } from './iteration.js';
 
 export interface SessionConfig {
   /** Maximum hours to run */
@@ -21,6 +22,10 @@ export interface SessionConfig {
   model?: 'sonnet' | 'opus' | 'haiku';
   /** Skip permission prompts */
   dangerouslySkipPermissions?: boolean;
+  /** Maximum iterations per story for retry */
+  maxIterations?: number;
+  /** Enable iteration-until-green mode */
+  iterateUntilGreen?: boolean;
 }
 
 export interface SessionState {
@@ -28,6 +33,7 @@ export interface SessionState {
   feature: Feature;
   storiesCompleted: number;
   storiesBlocked: number;
+  totalIterations: number;
   currentStory: Story | null;
   status: 'running' | 'paused' | 'completed' | 'blocked' | 'timeout' | 'error';
   blockerReason?: string;
@@ -50,6 +56,7 @@ export class SessionRunner {
   private obsidian: ObsidianClient;
   private featureManager: FeatureManager;
   private depManager: DependencyManager;
+  private iterationEngine: IterationEngine | null = null;
   private workingDir: string;
   private state: SessionState | null = null;
 
@@ -79,9 +86,19 @@ export class SessionRunner {
       feature,
       storiesCompleted: 0,
       storiesBlocked: 0,
+      totalIterations: 0,
       currentStory: null,
       status: 'running',
     };
+
+    // Initialize iteration engine if enabled
+    if (config.iterateUntilGreen) {
+      this.iterationEngine = new IterationEngine(this.workingDir, {
+        maxIterations: config.maxIterations || 5,
+        model: config.model,
+        dangerouslySkipPermissions: config.dangerouslySkipPermissions,
+      });
+    }
 
     // Build dependency graph
     this.depManager.buildFromStories(feature.stories);
@@ -152,7 +169,22 @@ export class SessionRunner {
         console.log(chalk.blue(`\n📋 Story ${story.id}: "${story.title}"`));
         await this.featureManager.updateStory(feature.id, story.id, { status: 'in_progress' });
 
-        const result = await this.executeStory(story, feature.title, config);
+        // Use iteration engine if enabled, otherwise single execution
+        let result: ClaudeOutput;
+        let iterations = 1;
+
+        if (this.iterationEngine) {
+          const iterResult = await this.iterationEngine.executeUntilGreen(story, feature.title);
+          iterations = iterResult.iterations;
+          result = iterResult.finalOutput;
+          this.state.totalIterations += iterations;
+
+          if (!iterResult.success && iterResult.stuckReason) {
+            console.log(chalk.yellow(`   ⚠️  ${iterResult.stuckReason}`));
+          }
+        } else {
+          result = await this.executeStory(story, feature.title, config);
+        }
 
         // Handle result
         if (result.status === 'complete') {
@@ -160,13 +192,19 @@ export class SessionRunner {
           if (result.pr) prs.push(result.pr);
 
           this.depManager.markComplete(story.id);
-          await this.featureManager.updateStory(feature.id, story.id, { status: 'complete' });
+          await this.featureManager.updateStory(feature.id, story.id, {
+            status: 'complete',
+            iterations,
+          });
           this.state.storiesCompleted++;
 
-          console.log(chalk.green(`   ✓ Story complete (${result.commits.length} commits)`));
+          console.log(chalk.green(`   ✓ Story complete (${result.commits.length} commits, ${iterations} iteration${iterations > 1 ? 's' : ''})`));
         } else if (result.status === 'blocked') {
           this.depManager.markBlocked(story.id);
-          await this.featureManager.updateStory(feature.id, story.id, { status: 'blocked' });
+          await this.featureManager.updateStory(feature.id, story.id, {
+            status: 'blocked',
+            iterations,
+          });
           this.state.storiesBlocked++;
           this.state.blockerReason = result.blockerReason;
 
@@ -195,7 +233,10 @@ export class SessionRunner {
           this.state.pendingQuestion = undefined;
         } else if (result.status === 'error' || result.status === 'timeout') {
           console.log(chalk.red(`   ✗ ${result.status}: ${result.error}`));
-          await this.featureManager.updateStory(feature.id, story.id, { status: 'blocked' });
+          await this.featureManager.updateStory(feature.id, story.id, {
+            status: 'blocked',
+            iterations,
+          });
           this.state.storiesBlocked++;
 
           if (config.stopOnBlocker) {
@@ -206,7 +247,7 @@ export class SessionRunner {
         }
 
         // Update Obsidian with session log
-        await this.logProgress(story, result);
+        await this.logProgress(story, result, iterations);
       }
     } catch (error) {
       this.state.status = 'error';
@@ -221,6 +262,7 @@ export class SessionRunner {
     console.log(`   Duration: ${totalDuration.toFixed(1)} minutes`);
     console.log(`   Completed: ${this.state.storiesCompleted} stories`);
     console.log(`   Blocked: ${this.state.storiesBlocked} stories`);
+    console.log(`   Total iterations: ${this.state.totalIterations}`);
     console.log(`   Commits: ${commits.length}`);
     console.log(`   PRs: ${prs.length}`);
 
@@ -282,16 +324,17 @@ export class SessionRunner {
   /**
    * Log progress to Obsidian
    */
-  private async logProgress(story: Story, result: ClaudeOutput): Promise<void> {
+  private async logProgress(story: Story, result: ClaudeOutput, iterations: number = 1): Promise<void> {
     if (!this.state) return;
 
     const date = new Date().toISOString().split('T')[0];
     const action = result.status === 'complete' ? 'Completed' :
                    result.status === 'blocked' ? 'Blocked' :
                    result.status === 'needs_input' ? 'Paused' : 'Error';
+    const iterText = iterations > 1 ? ` (${iterations} iterations)` : '';
     const details = result.status === 'complete'
-      ? `${result.commits.length} commits`
-      : result.blockerReason || result.question || result.error || '';
+      ? `${result.commits.length} commits${iterText}`
+      : (result.blockerReason || result.question || result.error || '') + iterText;
 
     await this.obsidian.appendSessionLog(
       `Projects/${this.state.feature.id}/_overview`,
