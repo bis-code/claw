@@ -3,6 +3,9 @@ node_modules/
 dist/
 *.tgz
 
+# Workspace config (user-specific)
+claw-workspace.json
+
 # Test dependencies (cloned during setup)
 tests/bats/
 tests/test_helper/bats-support/

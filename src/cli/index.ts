@@ -26,8 +26,78 @@ program
   .description('Initialize a claw workspace (auto-detect repos)')
   .option('-y, --yes', 'Accept detected configuration without prompts')
   .action(async (options) => {
-    console.log(chalk.blue('🔍 Detecting workspace...'));
-    console.log(chalk.yellow('Not yet implemented - Epic 1, Story 1.2'));
+    const { Workspace } = await import('../core/workspace.js');
+    const inquirer = await import('inquirer');
+    const ora = (await import('ora')).default;
+
+    const workspace = new Workspace(process.cwd());
+
+    // Check if already initialized
+    if (workspace.isInitialized()) {
+      console.log(chalk.yellow('⚠️  Workspace already initialized.'));
+      console.log(chalk.dim(`Config: ${workspace.getConfigPath()}`));
+
+      if (!options.yes) {
+        const { overwrite } = await inquirer.default.prompt([{
+          type: 'confirm',
+          name: 'overwrite',
+          message: 'Reinitialize workspace?',
+          default: false,
+        }]);
+        if (!overwrite) return;
+      }
+    }
+
+    // Detect repos
+    const spinner = ora('Scanning for repositories...').start();
+    const config = await workspace.init(false);
+    spinner.succeed(`Found ${config.repos.length} repositories`);
+
+    // Display detected structure
+    console.log('\n' + chalk.blue('📂 Detected workspace structure:') + '\n');
+    console.log(chalk.bold(`Workspace: ${config.name}\n`));
+
+    console.log('Repos:');
+    for (const repo of config.repos) {
+      const typeIcon = {
+        frontend: '🖥️',
+        backend: '⚙️',
+        shared: '📦',
+        web3: '⛓️',
+        monorepo: '📁',
+        unknown: '❓',
+      }[repo.type];
+
+      console.log(`  ${typeIcon} ${repo.name} (${repo.type}${repo.framework ? `, ${repo.framework}` : ''}${repo.language ? `, ${repo.language}` : ''})`);
+    }
+
+    if (config.relationships.length > 0) {
+      console.log('\nRelationships:');
+      for (const rel of config.relationships) {
+        console.log(`  ${rel.from} → ${rel.to} (${rel.type})`);
+      }
+    }
+
+    // Confirm or skip based on --yes flag
+    if (!options.yes) {
+      console.log('');
+      const { confirm } = await inquirer.default.prompt([{
+        type: 'confirm',
+        name: 'confirm',
+        message: 'Is this correct?',
+        default: true,
+      }]);
+
+      if (!confirm) {
+        console.log(chalk.yellow('Aborted. Edit claw-workspace.json manually or run again.'));
+        return;
+      }
+    }
+
+    // Save config
+    await workspace.save(config);
+    console.log(chalk.green(`\n✓ Workspace initialized: ${workspace.getConfigPath()}`));
+    console.log(chalk.dim('Run `claw feature "description"` to start a feature.'));
   });
 
 // claw feature - Create and run a feature
