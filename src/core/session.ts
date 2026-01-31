@@ -9,6 +9,7 @@ import { DependencyManager } from './dependencies.js';
 import { Feature, Story, FeatureManager } from './feature.js';
 import { IterationEngine, IterationResult } from './iteration.js';
 import { GitHubClient, GitHubPR } from '../integrations/github.js';
+import { CheckpointManager } from './checkpoint.js';
 
 export interface SessionConfig {
   /** Maximum hours to run */
@@ -62,9 +63,11 @@ export class SessionRunner {
   private featureManager: FeatureManager;
   private depManager: DependencyManager;
   private github: GitHubClient;
+  private checkpointManager: CheckpointManager;
   private iterationEngine: IterationEngine | null = null;
   private workingDir: string;
   private state: SessionState | null = null;
+  private currentConfig: SessionConfig | null = null;
 
   constructor(
     workingDir: string,
@@ -77,6 +80,7 @@ export class SessionRunner {
     this.featureManager = new FeatureManager(vaultPath, projectPath);
     this.depManager = new DependencyManager();
     this.github = new GitHubClient(workingDir);
+    this.checkpointManager = new CheckpointManager(vaultPath, projectPath);
   }
 
   /**
@@ -86,6 +90,9 @@ export class SessionRunner {
     const startTime = new Date();
     const commits: string[] = [];
     const prs: number[] = [];
+
+    // Save config for checkpointing
+    this.currentConfig = config;
 
     // Initialize state
     this.state = {
@@ -269,11 +276,17 @@ export class SessionRunner {
 
         // Update Obsidian with session log
         await this.logProgress(story, result, iterations);
+
+        // Save checkpoint after each story
+        await this.saveCheckpoint(feature);
       }
     } catch (error) {
       this.state.status = 'error';
       this.state.blockerReason = error instanceof Error ? error.message : String(error);
       console.log(chalk.red(`\n✗ Session error: ${this.state.blockerReason}`));
+
+      // Save checkpoint on error
+      await this.saveCheckpoint(feature);
     }
 
     const totalDuration = (new Date().getTime() - startTime.getTime()) / 1000 / 60; // minutes
@@ -470,6 +483,21 @@ ${commits.length > 20 ? `\n... and ${commits.length - 20} more` : ''}
   }
 
   /**
+   * Save checkpoint to Obsidian
+   */
+  private async saveCheckpoint(feature: Feature): Promise<void> {
+    if (!this.state || !this.currentConfig) return;
+
+    try {
+      // Re-fetch feature to get latest story states
+      const updatedFeature = await this.featureManager.get(feature.id) || feature;
+      await this.checkpointManager.saveCheckpoint(updatedFeature, this.state, this.currentConfig);
+    } catch (error) {
+      console.log(chalk.dim(`   (Failed to save checkpoint: ${error instanceof Error ? error.message : error})`));
+    }
+  }
+
+  /**
    * Get current state
    */
   getState(): SessionState | null {
@@ -486,11 +514,56 @@ ${commits.length > 20 ? `\n... and ${commits.length - 20} more` : ''}
   }
 
   /**
-   * Resume a paused session
+   * Check if a feature has a resumable checkpoint
    */
-  async resume(feature: Feature, config: SessionConfig): Promise<SessionResult> {
-    // For now, just restart - full resume would require checkpoint saving
-    return this.run(feature, config);
+  async hasCheckpoint(featureId: string): Promise<boolean> {
+    return this.checkpointManager.hasCheckpoint(featureId);
+  }
+
+  /**
+   * Get checkpoint data for a feature
+   */
+  async getCheckpoint(featureId: string) {
+    return this.checkpointManager.loadCheckpoint(featureId);
+  }
+
+  /**
+   * Resume a paused session from checkpoint
+   */
+  async resume(feature: Feature, config?: Partial<SessionConfig>): Promise<SessionResult> {
+    // Load checkpoint
+    const checkpoint = await this.checkpointManager.loadCheckpoint(feature.id);
+
+    if (!checkpoint) {
+      console.log(chalk.yellow('No checkpoint found, starting fresh.'));
+      return this.run(feature, config as SessionConfig);
+    }
+
+    console.log(chalk.blue(`\n📂 Resuming from checkpoint`));
+    console.log(chalk.dim(`   Previous status: ${checkpoint.sessionState.status}`));
+    console.log(chalk.dim(`   Stories completed: ${checkpoint.sessionState.storiesCompleted}`));
+    console.log(chalk.dim(`   Remaining time: ${this.checkpointManager.getRemainingTime(checkpoint).toFixed(1)}h`));
+
+    // Merge checkpoint config with provided overrides
+    const resumeConfig: SessionConfig = {
+      ...checkpoint.config as SessionConfig,
+      ...config,
+      // Use remaining time budget
+      maxHours: config?.maxHours || this.checkpointManager.getRemainingTime(checkpoint),
+    };
+
+    // Delete old checkpoint before starting fresh run
+    // (new checkpoints will be created during the run)
+    await this.checkpointManager.deleteCheckpoint(feature.id);
+
+    return this.run(feature, resumeConfig);
+  }
+
+  /**
+   * Clean up checkpoint after successful completion
+   */
+  async cleanupCheckpoint(featureId: string): Promise<void> {
+    await this.checkpointManager.deleteCheckpoint(featureId);
   }
 
   /**

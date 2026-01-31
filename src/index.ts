@@ -10,6 +10,7 @@ export { BreakdownGenerator, type BreakdownApproach, type ProposedStory, type Br
 export { StoryRefiner, type RefinementAction, type RefinementResult } from './core/refinement.js';
 export { DependencyManager, type DependencyNode, type DependencyGraph } from './core/dependencies.js';
 export { IterationEngine, type IterationConfig, type IterationState, type IterationResult, type StuckAnalysis } from './core/iteration.js';
+export { CheckpointManager, type CheckpointData } from './core/checkpoint.js';
 
 // Integrations
 export { ObsidianClient, type ObsidianNote } from './integrations/obsidian.js';
