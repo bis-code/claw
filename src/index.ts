@@ -8,6 +8,7 @@ export { SessionRunner, type SessionConfig, type SessionResult, type SessionStat
 export { DiscoveryEngine, type DiscoveryResult, type Finding, type DiscoveryMode, type DiscoveryOptions } from './core/discovery.js';
 export { BreakdownGenerator, type BreakdownApproach, type ProposedStory, type BreakdownContext } from './core/breakdown.js';
 export { StoryRefiner, type RefinementAction, type RefinementResult } from './core/refinement.js';
+export { DependencyManager, type DependencyNode, type DependencyGraph } from './core/dependencies.js';
 
 // Integrations
 export { ObsidianClient, type ObsidianNote } from './integrations/obsidian.js';
