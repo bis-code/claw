@@ -254,14 +254,72 @@ program
 
 // claw run - Execute pending stories
 program
-  .command('run')
+  .command('run [feature]')
   .description('Run pending stories autonomously')
   .option('--hours <n>', 'Time budget in hours', '4')
   .option('--stories <n>', 'Max stories to complete')
   .option('--until-blocked', 'Stop at first blocker')
-  .action(async (options) => {
-    console.log(chalk.blue('🤖 Starting autonomous execution...'));
-    console.log(chalk.yellow('Not yet implemented - Epic 3'));
+  .option('--pause-between', 'Pause between stories for review')
+  .option('--model <model>', 'Claude model to use (sonnet, opus, haiku)', 'sonnet')
+  .option('-y, --yes', 'Skip permission prompts')
+  .action(async (featureId, options) => {
+    const { Workspace } = await import('../core/workspace.js');
+    const { FeatureManager } = await import('../core/feature.js');
+    const { SessionRunner } = await import('../core/session.js');
+
+    const workspace = new Workspace(process.cwd());
+    const config = await workspace.load();
+
+    if (!config) {
+      console.log(chalk.red('✗ Workspace not initialized. Run `claw init` first.'));
+      process.exit(1);
+    }
+
+    const featureManager = new FeatureManager(
+      config.obsidian?.vault || '~/Documents/Obsidian',
+      config.obsidian?.project || `Projects/${config.name}`
+    );
+
+    // Get feature to run
+    let feature;
+    if (featureId) {
+      feature = await featureManager.get(featureId);
+      if (!feature) {
+        console.log(chalk.red(`✗ Feature not found: ${featureId}`));
+        process.exit(1);
+      }
+    } else {
+      // Get most recent feature with pending stories
+      const features = await featureManager.list();
+      feature = features.find(f => f.status !== 'complete');
+      if (!feature) {
+        console.log(chalk.yellow('No features with pending stories.'));
+        console.log(chalk.dim('Run `claw feature "description"` to create one.'));
+        return;
+      }
+    }
+
+    // Initialize session runner
+    const runner = new SessionRunner(
+      process.cwd(),
+      config.obsidian?.vault || '~/Documents/Obsidian',
+      config.obsidian?.project || `Projects/${config.name}`
+    );
+
+    // Run session
+    const result = await runner.run(feature, {
+      maxHours: parseFloat(options.hours),
+      maxStories: options.stories ? parseInt(options.stories, 10) : undefined,
+      stopOnBlocker: options.untilBlocked,
+      pauseBetweenStories: options.pauseBetween,
+      model: options.model as 'sonnet' | 'opus' | 'haiku',
+      dangerouslySkipPermissions: options.yes,
+    });
+
+    if (!result.success) {
+      console.log(chalk.yellow(`\nSession ended: ${result.error || 'incomplete'}`));
+      process.exit(1);
+    }
   });
 
 // claw resume - Resume from last state

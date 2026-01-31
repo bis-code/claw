@@ -1,71 +1,368 @@
-// Session management - running Claude sessions for stories
+// Session runner - autonomous execution loop
+
+import chalk from 'chalk';
+import ora from 'ora';
+import inquirer from 'inquirer';
+import { ClaudeClient, ClaudeOutput, SpawnOptions } from '../integrations/claude.js';
+import { ObsidianClient } from '../integrations/obsidian.js';
+import { DependencyManager } from './dependencies.js';
+import { Feature, Story, FeatureManager } from './feature.js';
 
 export interface SessionConfig {
-  storyId: string;
-  featureId: string;
-  repo: string;
-  context: string;
-  maxIterations?: number;
-  timeoutMinutes?: number;
-}
-
-export interface SessionResult {
-  status: 'complete' | 'blocked' | 'timeout' | 'error';
-  iterations: number;
-  commits: string[];
-  pr?: number;
-  error?: string;
-  blockerReason?: string;
+  /** Maximum hours to run */
+  maxHours: number;
+  /** Maximum stories to complete */
+  maxStories?: number;
+  /** Stop at first blocker */
+  stopOnBlocker?: boolean;
+  /** Pause between stories for review */
+  pauseBetweenStories?: boolean;
+  /** Claude model to use */
+  model?: 'sonnet' | 'opus' | 'haiku';
+  /** Skip permission prompts */
+  dangerouslySkipPermissions?: boolean;
 }
 
 export interface SessionState {
-  id: string;
-  storyId: string;
-  featureId: string;
-  startedAt: Date;
-  iteration: number;
-  lastError?: string;
-  filesChanged: string[];
+  startTime: Date;
+  feature: Feature;
+  storiesCompleted: number;
+  storiesBlocked: number;
+  currentStory: Story | null;
+  status: 'running' | 'paused' | 'completed' | 'blocked' | 'timeout' | 'error';
+  blockerReason?: string;
+  pendingQuestion?: string;
+}
+
+export interface SessionResult {
+  success: boolean;
+  storiesCompleted: number;
+  storiesBlocked: number;
+  totalDuration: number;
+  commits: string[];
+  prs: number[];
+  error?: string;
+  finalState: SessionState;
 }
 
 export class SessionRunner {
+  private claude: ClaudeClient;
+  private obsidian: ObsidianClient;
+  private featureManager: FeatureManager;
+  private depManager: DependencyManager;
+  private workingDir: string;
+  private state: SessionState | null = null;
+
   constructor(
-    private obsidianPath: string,
-    private workspacePath: string
-  ) {}
-
-  async run(config: SessionConfig): Promise<SessionResult> {
-    // TODO: Spawn claude session, monitor, collect results (Epic 3)
-    throw new Error('Not implemented - Epic 3');
+    workingDir: string,
+    vaultPath: string,
+    projectPath: string
+  ) {
+    this.workingDir = workingDir;
+    this.claude = new ClaudeClient(workingDir);
+    this.obsidian = new ObsidianClient(vaultPath);
+    this.featureManager = new FeatureManager(vaultPath, projectPath);
+    this.depManager = new DependencyManager();
   }
 
-  async resume(sessionId: string): Promise<SessionResult> {
-    // TODO: Resume session from Obsidian state (Story 4.4)
-    throw new Error('Not implemented - Story 4.4');
+  /**
+   * Run a feature session
+   */
+  async run(feature: Feature, config: SessionConfig): Promise<SessionResult> {
+    const startTime = new Date();
+    const commits: string[] = [];
+    const prs: number[] = [];
+
+    // Initialize state
+    this.state = {
+      startTime,
+      feature,
+      storiesCompleted: 0,
+      storiesBlocked: 0,
+      currentStory: null,
+      status: 'running',
+    };
+
+    // Build dependency graph
+    this.depManager.buildFromStories(feature.stories);
+
+    console.log(chalk.blue(`\n🚀 Starting session: "${feature.title}"`));
+    console.log(chalk.dim(`   Budget: ${config.maxHours} hours`));
+    console.log(chalk.dim(`   Stories: ${feature.stories.length}`));
+
+    const deadline = new Date(startTime.getTime() + config.maxHours * 60 * 60 * 1000);
+
+    try {
+      // Main execution loop
+      while (this.state.status === 'running') {
+        // Check time budget
+        if (new Date() >= deadline) {
+          console.log(chalk.yellow('\n⏰ Time budget exhausted'));
+          this.state.status = 'timeout';
+          break;
+        }
+
+        // Check story limit
+        if (config.maxStories && this.state.storiesCompleted >= config.maxStories) {
+          console.log(chalk.green(`\n✓ Completed ${config.maxStories} stories (limit reached)`));
+          this.state.status = 'completed';
+          break;
+        }
+
+        // Get next story
+        const nextNode = this.depManager.getNextStory();
+        if (!nextNode) {
+          const progress = this.depManager.getProgress();
+          if (progress.complete === progress.total) {
+            console.log(chalk.green('\n✓ All stories completed!'));
+            this.state.status = 'completed';
+          } else if (progress.blocked > 0 || progress.pending > 0) {
+            console.log(chalk.yellow('\n⚠️  No ready stories - all remaining are blocked'));
+            this.state.status = 'blocked';
+          }
+          break;
+        }
+
+        // Find the actual story object
+        const story = feature.stories.find(s => s.id === nextNode.id);
+        if (!story) {
+          console.log(chalk.red(`\n✗ Story not found: ${nextNode.id}`));
+          continue;
+        }
+
+        this.state.currentStory = story;
+        this.depManager.markInProgress(story.id);
+
+        // Pause for review if configured
+        if (config.pauseBetweenStories && this.state.storiesCompleted > 0) {
+          const { proceed } = await inquirer.prompt([{
+            type: 'confirm',
+            name: 'proceed',
+            message: `Continue with story "${story.title}"?`,
+            default: true,
+          }]);
+
+          if (!proceed) {
+            this.state.status = 'paused';
+            break;
+          }
+        }
+
+        // Execute story
+        console.log(chalk.blue(`\n📋 Story ${story.id}: "${story.title}"`));
+        await this.featureManager.updateStory(feature.id, story.id, { status: 'in_progress' });
+
+        const result = await this.executeStory(story, feature.title, config);
+
+        // Handle result
+        if (result.status === 'complete') {
+          commits.push(...result.commits);
+          if (result.pr) prs.push(result.pr);
+
+          this.depManager.markComplete(story.id);
+          await this.featureManager.updateStory(feature.id, story.id, { status: 'complete' });
+          this.state.storiesCompleted++;
+
+          console.log(chalk.green(`   ✓ Story complete (${result.commits.length} commits)`));
+        } else if (result.status === 'blocked') {
+          this.depManager.markBlocked(story.id);
+          await this.featureManager.updateStory(feature.id, story.id, { status: 'blocked' });
+          this.state.storiesBlocked++;
+          this.state.blockerReason = result.blockerReason;
+
+          console.log(chalk.yellow(`   🚫 Blocked: ${result.blockerReason}`));
+
+          if (config.stopOnBlocker) {
+            this.state.status = 'blocked';
+            break;
+          }
+        } else if (result.status === 'needs_input') {
+          this.state.pendingQuestion = result.question;
+          this.state.status = 'paused';
+
+          console.log(chalk.cyan(`   ❓ Input needed: ${result.question}`));
+
+          // Prompt for answer
+          const { answer } = await inquirer.prompt([{
+            type: 'input',
+            name: 'answer',
+            message: result.question || 'Please provide input:',
+          }]);
+
+          // Continue with the answer (in a real implementation, we'd pass this back to Claude)
+          console.log(chalk.dim(`   → Answer recorded: ${answer}`));
+          this.state.status = 'running';
+          this.state.pendingQuestion = undefined;
+        } else if (result.status === 'error' || result.status === 'timeout') {
+          console.log(chalk.red(`   ✗ ${result.status}: ${result.error}`));
+          await this.featureManager.updateStory(feature.id, story.id, { status: 'blocked' });
+          this.state.storiesBlocked++;
+
+          if (config.stopOnBlocker) {
+            this.state.status = 'error';
+            this.state.blockerReason = result.error;
+            break;
+          }
+        }
+
+        // Update Obsidian with session log
+        await this.logProgress(story, result);
+      }
+    } catch (error) {
+      this.state.status = 'error';
+      this.state.blockerReason = error instanceof Error ? error.message : String(error);
+      console.log(chalk.red(`\n✗ Session error: ${this.state.blockerReason}`));
+    }
+
+    const totalDuration = (new Date().getTime() - startTime.getTime()) / 1000 / 60; // minutes
+
+    // Summary
+    console.log(chalk.blue('\n📊 Session Summary'));
+    console.log(`   Duration: ${totalDuration.toFixed(1)} minutes`);
+    console.log(`   Completed: ${this.state.storiesCompleted} stories`);
+    console.log(`   Blocked: ${this.state.storiesBlocked} stories`);
+    console.log(`   Commits: ${commits.length}`);
+    console.log(`   PRs: ${prs.length}`);
+
+    return {
+      success: this.state.status === 'completed',
+      storiesCompleted: this.state.storiesCompleted,
+      storiesBlocked: this.state.storiesBlocked,
+      totalDuration,
+      commits,
+      prs,
+      error: this.state.blockerReason,
+      finalState: this.state,
+    };
   }
 
-  async interrupt(sessionId: string, action: 'pause' | 'skip' | 'abort'): Promise<void> {
-    // TODO: Handle keyboard interrupts (Story 4.1)
-    throw new Error('Not implemented - Story 4.1');
+  /**
+   * Execute a single story
+   */
+  private async executeStory(
+    story: Story,
+    featureTitle: string,
+    config: SessionConfig
+  ): Promise<ClaudeOutput> {
+    const spinner = ora(`Executing: ${story.title}`).start();
+
+    // Build prompt
+    const prompt = this.claude.generateStoryPrompt(
+      {
+        title: story.title,
+        scope: story.scope,
+        repos: story.repos,
+      },
+      featureTitle
+    );
+
+    // Spawn options
+    const options: SpawnOptions = {
+      model: config.model || 'sonnet',
+      dangerouslySkipPermissions: config.dangerouslySkipPermissions,
+      maxTurns: 50,
+      timeoutMs: 30 * 60 * 1000, // 30 minutes per story
+    };
+
+    try {
+      const output = await this.claude.run(prompt, options);
+      spinner.stop();
+      return output;
+    } catch (error) {
+      spinner.fail('Execution failed');
+      return {
+        status: 'error',
+        commits: [],
+        rawOutput: '',
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
   }
 
-  async askClaude(sessionId: string, question: string): Promise<string> {
-    // TODO: Ask Claude mid-session (Story 4.2)
-    throw new Error('Not implemented - Story 4.2');
+  /**
+   * Log progress to Obsidian
+   */
+  private async logProgress(story: Story, result: ClaudeOutput): Promise<void> {
+    if (!this.state) return;
+
+    const date = new Date().toISOString().split('T')[0];
+    const action = result.status === 'complete' ? 'Completed' :
+                   result.status === 'blocked' ? 'Blocked' :
+                   result.status === 'needs_input' ? 'Paused' : 'Error';
+    const details = result.status === 'complete'
+      ? `${result.commits.length} commits`
+      : result.blockerReason || result.question || result.error || '';
+
+    await this.obsidian.appendSessionLog(
+      `Projects/${this.state.feature.id}/_overview`,
+      { date, action: `Story ${story.id}: ${action}`, details }
+    );
   }
 
-  async pivot(sessionId: string, pivotData: any): Promise<void> {
-    // TODO: Handle pivot request (Story 4.3)
-    throw new Error('Not implemented - Story 4.3');
+  /**
+   * Get current state
+   */
+  getState(): SessionState | null {
+    return this.state;
   }
 
-  private async spawnClaude(repo: string, prompt: string): Promise<string> {
-    // TODO: Actually spawn claude CLI (Story 1.5)
-    throw new Error('Not implemented - Story 1.5');
+  /**
+   * Pause the session
+   */
+  pause(): void {
+    if (this.state) {
+      this.state.status = 'paused';
+    }
   }
 
-  private async parseOutput(output: string): Promise<{ status: string; commits: string[]; pr?: number }> {
-    // TODO: Parse CLAW_STATUS markers from output (Story 1.5)
-    throw new Error('Not implemented - Story 1.5');
+  /**
+   * Resume a paused session
+   */
+  async resume(feature: Feature, config: SessionConfig): Promise<SessionResult> {
+    // For now, just restart - full resume would require checkpoint saving
+    return this.run(feature, config);
+  }
+
+  /**
+   * Interrupt the current session
+   */
+  async interrupt(action: 'pause' | 'skip' | 'abort'): Promise<void> {
+    if (!this.state) return;
+
+    switch (action) {
+      case 'pause':
+        this.state.status = 'paused';
+        console.log(chalk.yellow('\n⏸️  Session paused'));
+        break;
+      case 'skip':
+        if (this.state.currentStory) {
+          this.depManager.markBlocked(this.state.currentStory.id);
+          console.log(chalk.yellow(`\n⏭️  Skipped story: ${this.state.currentStory.title}`));
+        }
+        break;
+      case 'abort':
+        this.state.status = 'error';
+        this.state.blockerReason = 'User aborted';
+        console.log(chalk.red('\n🛑 Session aborted'));
+        break;
+    }
+  }
+
+  /**
+   * Ask Claude a question mid-session
+   */
+  async askClaude(question: string): Promise<string> {
+    if (!this.state?.currentStory) {
+      return 'No active session';
+    }
+
+    console.log(chalk.cyan(`\n❓ Asking Claude: ${question}`));
+
+    const output = await this.claude.run(
+      `Context: Working on story "${this.state.currentStory.title}"\n\nQuestion: ${question}\n\nProvide a brief, helpful response.`,
+      { model: 'haiku', maxTurns: 3, dangerouslySkipPermissions: true }
+    );
+
+    return output.rawOutput;
   }
 }
