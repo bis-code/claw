@@ -1,0 +1,62 @@
+{
+  "name": "@bis-code/claw",
+  "version": "2.0.0-alpha.1",
+  "description": "Claude Automated Workflow - Orchestration layer for autonomous AI development",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "claw": "dist/cli/index.js",
+    "claw-v2": "dist/cli/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/cli/index.js",
+    "test": "NODE_OPTIONS='--experimental-vm-modules' jest",
+    "test:watch": "NODE_OPTIONS='--experimental-vm-modules' jest --watch",
+    "lint": "eslint src/",
+    "clean": "rm -rf dist/",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "claude",
+    "ai",
+    "automation",
+    "cli",
+    "workflow",
+    "orchestration"
+  ],
+  "author": "Ioan-Sorin Baicoianu <baicoianuioansorin@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bis-code/claw.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bis-code/claw/issues"
+  },
+  "homepage": "https://github.com/bis-code/claw#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "inquirer": "^9.2.23",
+    "ora": "^8.0.1"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^9.0.7",
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.14.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.4",
+    "typescript": "^5.4.5"
+  }
+}

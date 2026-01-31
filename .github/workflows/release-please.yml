@@ -1,15 +1,15 @@
 name: Release Please
 
 on:
-  workflow_dispatch:  # Manual trigger only - no automatic releases
+  push:
+    branches:
+      - main
+  workflow_dispatch:
     inputs:
       reason:
         description: 'Reason for release'
         required: false
         default: 'Manual release'
-  # push:
-  #   branches:
-  #     - main
 
 permissions:
   contents: write
