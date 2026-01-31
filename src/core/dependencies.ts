@@ -387,6 +387,67 @@ export class DependencyManager {
   }
 
   /**
+   * Add a new node dynamically (for pivot operations)
+   */
+  addNode(storyId: string, title: string = '', blockedBy: string[] = []): void {
+    this.nodes.set(storyId, {
+      id: storyId,
+      title,
+      status: blockedBy.length === 0 ? 'ready' : 'pending',
+      blockedBy,
+      blocks: [],
+    });
+
+    // Update blocks for dependencies
+    for (const blockerId of blockedBy) {
+      const blocker = this.nodes.get(blockerId);
+      if (blocker) {
+        blocker.blocks.push(storyId);
+      }
+    }
+  }
+
+  /**
+   * Clear all dependencies for a story (for prioritization)
+   */
+  clearDependencies(storyId: string): void {
+    const node = this.nodes.get(storyId);
+    if (!node) return;
+
+    // Remove this story from blockers' "blocks" list
+    for (const blockerId of node.blockedBy) {
+      const blocker = this.nodes.get(blockerId);
+      if (blocker) {
+        blocker.blocks = blocker.blocks.filter(id => id !== storyId);
+      }
+    }
+
+    // Clear the blockedBy list
+    node.blockedBy = [];
+
+    // Update status
+    if (node.status === 'pending') {
+      node.status = 'ready';
+    }
+  }
+
+  /**
+   * Reset a story back to ready state (for restart)
+   */
+  resetStory(storyId: string): void {
+    const node = this.nodes.get(storyId);
+    if (!node) return;
+
+    // Check if all blockers are complete
+    const allBlockersComplete = node.blockedBy.every(blockerId => {
+      const blocker = this.nodes.get(blockerId);
+      return blocker?.status === 'complete';
+    });
+
+    node.status = allBlockersComplete ? 'ready' : 'pending';
+  }
+
+  /**
    * Get all nodes
    */
   getAllNodes(): DependencyNode[] {

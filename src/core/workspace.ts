@@ -1,8 +1,9 @@
 // Workspace management - detecting and configuring multi-repo workspaces
 
 import { readdir, readFile, writeFile, stat } from 'fs/promises';
-import { join, basename } from 'path';
+import { join, basename, relative } from 'path';
 import { existsSync } from 'fs';
+import { spawn } from 'child_process';
 
 export interface Repo {
   path: string;
@@ -33,6 +34,36 @@ export interface RepoRelationship {
   to: string;
   type: 'api-consumer' | 'abi-consumer' | 'shared-types' | 'depends-on';
   contract?: string;
+}
+
+export interface RepoContext {
+  repo: Repo;
+  recentFiles: string[];
+  gitStatus: {
+    branch: string;
+    modified: string[];
+    staged: string[];
+    untracked: string[];
+  };
+  relevantFiles?: string[];
+}
+
+export interface CrossRepoContext {
+  repos: RepoContext[];
+  sharedTypes?: string[];
+  apiContracts?: string[];
+  changedContracts?: string[];
+}
+
+export interface MultiRepoCommit {
+  message: string;
+  repos: {
+    repoPath: string;
+    files: string[];
+    success: boolean;
+    error?: string;
+    commitHash?: string;
+  }[];
 }
 
 export class Workspace {
@@ -273,5 +304,360 @@ export class Workspace {
     }
 
     return config;
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Multi-Repo Operations (Epic 5)
+  // ─────────────────────────────────────────────────────────────
+
+  /**
+   * Run a git command in a repo and return output
+   */
+  private async runGit(repoPath: string, args: string[]): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const proc = spawn('git', args, { cwd: repoPath });
+      let stdout = '';
+      let stderr = '';
+
+      proc.stdout?.on('data', (data) => { stdout += data.toString(); });
+      proc.stderr?.on('data', (data) => { stderr += data.toString(); });
+
+      proc.on('close', (code) => {
+        if (code === 0) {
+          resolve(stdout.trim());
+        } else {
+          reject(new Error(stderr || `Git command failed with code ${code}`));
+        }
+      });
+    });
+  }
+
+  /**
+   * Get git status for a repo
+   */
+  async getRepoGitStatus(repoPath: string): Promise<RepoContext['gitStatus']> {
+    try {
+      const branch = await this.runGit(repoPath, ['branch', '--show-current']);
+      const status = await this.runGit(repoPath, ['status', '--porcelain']);
+
+      const modified: string[] = [];
+      const staged: string[] = [];
+      const untracked: string[] = [];
+
+      for (const line of status.split('\n').filter(Boolean)) {
+        const indexStatus = line[0];
+        const workStatus = line[1];
+        const file = line.slice(3);
+
+        if (indexStatus !== ' ' && indexStatus !== '?') {
+          staged.push(file);
+        }
+        if (workStatus === 'M' || workStatus === 'D') {
+          modified.push(file);
+        }
+        if (indexStatus === '?') {
+          untracked.push(file);
+        }
+      }
+
+      return { branch, modified, staged, untracked };
+    } catch (error) {
+      return { branch: 'unknown', modified: [], staged: [], untracked: [] };
+    }
+  }
+
+  /**
+   * Get recent files changed in a repo
+   */
+  async getRecentFiles(repoPath: string, days: number = 7): Promise<string[]> {
+    try {
+      const since = new Date();
+      since.setDate(since.getDate() - days);
+      const sinceStr = since.toISOString().split('T')[0];
+
+      const output = await this.runGit(repoPath, [
+        'log',
+        `--since=${sinceStr}`,
+        '--name-only',
+        '--pretty=format:',
+      ]);
+
+      const files = output
+        .split('\n')
+        .filter(Boolean)
+        .filter((file, index, arr) => arr.indexOf(file) === index);
+
+      return files.slice(0, 50); // Limit to 50 most recent
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Get context for a single repo
+   */
+  async getRepoContext(repo: Repo): Promise<RepoContext> {
+    const gitStatus = await this.getRepoGitStatus(repo.path);
+    const recentFiles = await this.getRecentFiles(repo.path);
+
+    return {
+      repo,
+      recentFiles,
+      gitStatus,
+    };
+  }
+
+  /**
+   * Get cross-repo context for a feature
+   * This provides context to Claude about the entire workspace
+   */
+  async getCrossRepoContext(repoNames?: string[]): Promise<CrossRepoContext> {
+    if (!this.config) {
+      await this.load();
+    }
+
+    const repos = this.config?.repos || [];
+    const targetRepos = repoNames
+      ? repos.filter(r => repoNames.includes(r.name))
+      : repos;
+
+    const contexts = await Promise.all(targetRepos.map(r => this.getRepoContext(r)));
+
+    // Find shared types and API contracts
+    const sharedTypes: string[] = [];
+    const apiContracts: string[] = [];
+    const changedContracts: string[] = [];
+
+    for (const ctx of contexts) {
+      const typesFiles = ctx.recentFiles.filter(f =>
+        f.includes('types') || f.includes('.d.ts') || f.endsWith('.interface.ts')
+      );
+      sharedTypes.push(...typesFiles.map(f => `${ctx.repo.name}:${f}`));
+
+      const apiFiles = ctx.recentFiles.filter(f =>
+        f.includes('api') || f.includes('routes') || f.includes('endpoint')
+      );
+      apiContracts.push(...apiFiles.map(f => `${ctx.repo.name}:${f}`));
+
+      // Check if any contracts were modified
+      const modifiedContracts = [...ctx.gitStatus.modified, ...ctx.gitStatus.staged].filter(f =>
+        f.includes('types') || f.includes('api') || f.includes('.d.ts')
+      );
+      changedContracts.push(...modifiedContracts.map(f => `${ctx.repo.name}:${f}`));
+    }
+
+    return {
+      repos: contexts,
+      sharedTypes: [...new Set(sharedTypes)],
+      apiContracts: [...new Set(apiContracts)],
+      changedContracts: [...new Set(changedContracts)],
+    };
+  }
+
+  /**
+   * Stage files in a repo
+   */
+  async stageFiles(repoPath: string, files: string[]): Promise<boolean> {
+    try {
+      if (files.length === 0) {
+        // Stage all modified files
+        await this.runGit(repoPath, ['add', '-u']);
+      } else {
+        await this.runGit(repoPath, ['add', ...files]);
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Commit in a single repo
+   */
+  async commitRepo(repoPath: string, message: string): Promise<{ success: boolean; hash?: string; error?: string }> {
+    try {
+      await this.runGit(repoPath, ['commit', '-m', message]);
+      const hash = await this.runGit(repoPath, ['rev-parse', '--short', 'HEAD']);
+      return { success: true, hash };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  /**
+   * Coordinate commits across multiple repos
+   * Ensures atomic-like behavior with rollback on failure
+   */
+  async coordinatedCommit(
+    repoChanges: { repoPath: string; files: string[] }[],
+    message: string
+  ): Promise<MultiRepoCommit> {
+    const result: MultiRepoCommit = {
+      message,
+      repos: [],
+    };
+
+    const committed: string[] = [];
+
+    try {
+      for (const change of repoChanges) {
+        // Stage files
+        const staged = await this.stageFiles(change.repoPath, change.files);
+        if (!staged) {
+          result.repos.push({
+            repoPath: change.repoPath,
+            files: change.files,
+            success: false,
+            error: 'Failed to stage files',
+          });
+          continue;
+        }
+
+        // Check if there's anything to commit
+        const status = await this.getRepoGitStatus(change.repoPath);
+        if (status.staged.length === 0) {
+          result.repos.push({
+            repoPath: change.repoPath,
+            files: change.files,
+            success: true,
+            commitHash: 'no-changes',
+          });
+          continue;
+        }
+
+        // Commit
+        const commitResult = await this.commitRepo(change.repoPath, message);
+        result.repos.push({
+          repoPath: change.repoPath,
+          files: change.files,
+          success: commitResult.success,
+          commitHash: commitResult.hash,
+          error: commitResult.error,
+        });
+
+        if (commitResult.success) {
+          committed.push(change.repoPath);
+        }
+      }
+
+      // Check if we need to rollback (if some succeeded and some failed)
+      const failures = result.repos.filter(r => !r.success && r.error !== 'Failed to stage files');
+      if (failures.length > 0 && committed.length > 0) {
+        // Rollback committed repos
+        for (const repoPath of committed) {
+          try {
+            await this.runGit(repoPath, ['reset', '--soft', 'HEAD~1']);
+          } catch {
+            // Best effort rollback
+          }
+        }
+
+        // Mark all as rolled back
+        for (const repo of result.repos) {
+          if (repo.success && repo.commitHash !== 'no-changes') {
+            repo.success = false;
+            repo.error = 'Rolled back due to failure in another repo';
+            repo.commitHash = undefined;
+          }
+        }
+      }
+    } catch (error) {
+      // General error - mark all as failed
+      for (const repo of result.repos) {
+        if (repo.success && repo.commitHash !== 'no-changes') {
+          repo.success = false;
+          repo.error = error instanceof Error ? error.message : String(error);
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Create coordinated branches across repos
+   */
+  async createBranchesInRepos(repoNames: string[], branchName: string): Promise<{ repo: string; success: boolean; error?: string }[]> {
+    const repos = this.config?.repos.filter(r => repoNames.includes(r.name)) || [];
+    const results: { repo: string; success: boolean; error?: string }[] = [];
+
+    for (const repo of repos) {
+      try {
+        // Check if branch already exists
+        try {
+          await this.runGit(repo.path, ['rev-parse', '--verify', branchName]);
+          // Branch exists, checkout
+          await this.runGit(repo.path, ['checkout', branchName]);
+        } catch {
+          // Branch doesn't exist, create it
+          await this.runGit(repo.path, ['checkout', '-b', branchName]);
+        }
+        results.push({ repo: repo.name, success: true });
+      } catch (error) {
+        results.push({
+          repo: repo.name,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Get affected repos for a set of file changes
+   */
+  getAffectedRepos(changedFiles: string[]): Repo[] {
+    if (!this.config) return [];
+
+    const affected = new Set<string>();
+
+    for (const file of changedFiles) {
+      for (const repo of this.config.repos) {
+        if (file.startsWith(repo.path) || file.includes(repo.name)) {
+          affected.add(repo.name);
+        }
+      }
+    }
+
+    // Also add repos that consume changed repos (via relationships)
+    for (const rel of this.config.relationships) {
+      if (affected.has(rel.to)) {
+        affected.add(rel.from);
+      }
+    }
+
+    return this.config.repos.filter(r => affected.has(r.name));
+  }
+
+  /**
+   * Format cross-repo context as a prompt for Claude
+   */
+  formatContextForPrompt(context: CrossRepoContext): string {
+    const lines: string[] = ['## Workspace Context', ''];
+
+    for (const repoCtx of context.repos) {
+      lines.push(`### ${repoCtx.repo.name} (${repoCtx.repo.type})`);
+      lines.push(`- Framework: ${repoCtx.repo.framework || 'N/A'}`);
+      lines.push(`- Branch: ${repoCtx.gitStatus.branch}`);
+
+      if (repoCtx.gitStatus.modified.length > 0) {
+        lines.push(`- Modified: ${repoCtx.gitStatus.modified.slice(0, 5).join(', ')}`);
+      }
+      if (repoCtx.gitStatus.staged.length > 0) {
+        lines.push(`- Staged: ${repoCtx.gitStatus.staged.slice(0, 5).join(', ')}`);
+      }
+
+      lines.push('');
+    }
+
+    if (context.changedContracts && context.changedContracts.length > 0) {
+      lines.push('### Changed Contracts (⚠️ May require coordination)');
+      lines.push(context.changedContracts.map(c => `- ${c}`).join('\n'));
+      lines.push('');
+    }
+
+    return lines.join('\n');
   }
 }

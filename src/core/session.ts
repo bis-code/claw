@@ -10,6 +10,7 @@ import { Feature, Story, FeatureManager } from './feature.js';
 import { IterationEngine, IterationResult } from './iteration.js';
 import { GitHubClient, GitHubPR } from '../integrations/github.js';
 import { CheckpointManager } from './checkpoint.js';
+import { HotkeyManager } from './hotkeys.js';
 
 export interface SessionConfig {
   /** Maximum hours to run */
@@ -64,10 +65,12 @@ export class SessionRunner {
   private depManager: DependencyManager;
   private github: GitHubClient;
   private checkpointManager: CheckpointManager;
+  private hotkeyManager: HotkeyManager;
   private iterationEngine: IterationEngine | null = null;
   private workingDir: string;
   private state: SessionState | null = null;
   private currentConfig: SessionConfig | null = null;
+  private isPivoting: boolean = false;
 
   constructor(
     workingDir: string,
@@ -81,6 +84,16 @@ export class SessionRunner {
     this.depManager = new DependencyManager();
     this.github = new GitHubClient(workingDir);
     this.checkpointManager = new CheckpointManager(vaultPath, projectPath);
+
+    // Initialize hotkey manager with callbacks
+    this.hotkeyManager = new HotkeyManager({
+      onPause: () => this.handleHotkeyPause(),
+      onSkip: () => this.handleHotkeySkip(),
+      onAbort: () => this.handleHotkeyAbort(),
+      onAsk: () => this.handleHotkeyAsk(),
+      onPivot: () => this.handleHotkeyPivot(),
+      onStatus: () => this.handleHotkeyStatus(),
+    });
   }
 
   /**
@@ -122,6 +135,9 @@ export class SessionRunner {
     console.log(chalk.dim(`   Stories: ${feature.stories.length}`));
 
     const deadline = new Date(startTime.getTime() + config.maxHours * 60 * 60 * 1000);
+
+    // Start listening for hotkeys
+    this.hotkeyManager.start();
 
     try {
       // Main execution loop
@@ -287,6 +303,9 @@ export class SessionRunner {
 
       // Save checkpoint on error
       await this.saveCheckpoint(feature);
+
+      // Stop hotkey listening on error
+      this.hotkeyManager.stop();
     }
 
     const totalDuration = (new Date().getTime() - startTime.getTime()) / 1000 / 60; // minutes
@@ -304,6 +323,9 @@ export class SessionRunner {
         console.log(chalk.yellow(`   ⚠️  Failed to create PR: ${error instanceof Error ? error.message : error}`));
       }
     }
+
+    // Stop listening for hotkeys
+    this.hotkeyManager.stop();
 
     // Summary
     console.log(chalk.blue('\n📊 Session Summary'));
@@ -607,5 +629,240 @@ ${commits.length > 20 ? `\n... and ${commits.length - 20} more` : ''}
     );
 
     return output.rawOutput;
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Hotkey Handlers
+  // ─────────────────────────────────────────────────────────────
+
+  /**
+   * Handle pause hotkey (p)
+   */
+  private async handleHotkeyPause(): Promise<void> {
+    await this.interrupt('pause');
+    if (this.state) {
+      await this.saveCheckpoint(this.state.feature);
+    }
+  }
+
+  /**
+   * Handle skip hotkey (s)
+   */
+  private async handleHotkeySkip(): Promise<void> {
+    await this.interrupt('skip');
+  }
+
+  /**
+   * Handle abort hotkey (q) or Ctrl+C
+   */
+  private async handleHotkeyAbort(): Promise<void> {
+    if (this.state) {
+      await this.saveCheckpoint(this.state.feature);
+    }
+    await this.interrupt('abort');
+  }
+
+  /**
+   * Handle ask hotkey (?)
+   */
+  private async handleHotkeyAsk(): Promise<void> {
+    // Suspend hotkeys while prompting
+    this.hotkeyManager.suspend();
+
+    try {
+      const { question } = await inquirer.prompt([{
+        type: 'input',
+        name: 'question',
+        message: 'Ask Claude:',
+      }]);
+
+      if (question?.trim()) {
+        const answer = await this.askClaude(question);
+        console.log(chalk.cyan(`\n💬 Claude: ${answer}\n`));
+      }
+    } finally {
+      // Resume hotkeys after prompting
+      this.hotkeyManager.resume();
+    }
+  }
+
+  /**
+   * Handle pivot hotkey (v) - opens pivot menu
+   */
+  private async handleHotkeyPivot(): Promise<void> {
+    if (this.isPivoting) return;
+    this.isPivoting = true;
+
+    // Suspend hotkeys while in pivot menu
+    this.hotkeyManager.suspend();
+
+    try {
+      const { pivotAction } = await inquirer.prompt([{
+        type: 'list',
+        name: 'pivotAction',
+        message: 'Pivot Menu:',
+        choices: [
+          { name: '📋 Change story priority', value: 'priority' },
+          { name: '➕ Add new story', value: 'add' },
+          { name: '⏭️  Skip remaining stories', value: 'skip_rest' },
+          { name: '🔄 Restart current story', value: 'restart' },
+          { name: '❌ Cancel', value: 'cancel' },
+        ],
+      }]);
+
+      switch (pivotAction) {
+        case 'priority':
+          await this.handlePivotPriority();
+          break;
+        case 'add':
+          await this.handlePivotAddStory();
+          break;
+        case 'skip_rest':
+          await this.handlePivotSkipRest();
+          break;
+        case 'restart':
+          await this.handlePivotRestart();
+          break;
+        case 'cancel':
+        default:
+          console.log(chalk.dim('Pivot cancelled'));
+          break;
+      }
+    } finally {
+      this.isPivoting = false;
+      this.hotkeyManager.resume();
+    }
+  }
+
+  /**
+   * Handle status hotkey (i)
+   */
+  private handleHotkeyStatus(): void {
+    if (!this.state) {
+      console.log(chalk.yellow('\nNo active session'));
+      return;
+    }
+
+    const elapsed = (Date.now() - this.state.startTime.getTime()) / 1000 / 60;
+    const progress = this.depManager.getProgress();
+
+    console.log(chalk.blue('\n📊 Session Status'));
+    console.log(`   Status: ${this.state.status}`);
+    console.log(`   Elapsed: ${elapsed.toFixed(1)} minutes`);
+    console.log(`   Current: ${this.state.currentStory?.title || 'None'}`);
+    console.log(`   Progress: ${progress.complete}/${progress.total} stories`);
+    console.log(`   Blocked: ${progress.blocked}`);
+    console.log(`   Iterations: ${this.state.totalIterations}`);
+    console.log('');
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Pivot Sub-handlers
+  // ─────────────────────────────────────────────────────────────
+
+  /**
+   * Pivot: Change story priority
+   */
+  private async handlePivotPriority(): Promise<void> {
+    const pendingStories = this.state?.feature.stories.filter(
+      s => s.status === 'pending' || s.status === 'in_progress'
+    ) || [];
+
+    if (pendingStories.length === 0) {
+      console.log(chalk.yellow('No pending stories to reorder'));
+      return;
+    }
+
+    const { selectedStory } = await inquirer.prompt([{
+      type: 'list',
+      name: 'selectedStory',
+      message: 'Select story to prioritize:',
+      choices: pendingStories.map(s => ({
+        name: `${s.id}: ${s.title}`,
+        value: s.id,
+      })),
+    }]);
+
+    // Mark story as high priority by clearing its dependencies
+    this.depManager.clearDependencies(selectedStory);
+    console.log(chalk.green(`✓ Story ${selectedStory} prioritized (dependencies cleared)`));
+  }
+
+  /**
+   * Pivot: Add a new story
+   */
+  private async handlePivotAddStory(): Promise<void> {
+    const { title, scope } = await inquirer.prompt([
+      {
+        type: 'input',
+        name: 'title',
+        message: 'Story title:',
+      },
+      {
+        type: 'input',
+        name: 'scope',
+        message: 'Scope (comma-separated):',
+      },
+    ]);
+
+    if (!title?.trim()) {
+      console.log(chalk.yellow('Story title required'));
+      return;
+    }
+
+    // Add to feature and dependency graph
+    const newStory: Story = {
+      id: `pivot-${Date.now()}`,
+      title: title.trim(),
+      scope: scope?.split(',').map((s: string) => s.trim()).filter(Boolean) || [],
+      repos: [],
+      status: 'pending',
+    };
+
+    if (this.state) {
+      this.state.feature.stories.push(newStory);
+      this.depManager.addNode(newStory.id);
+      console.log(chalk.green(`✓ Story "${newStory.title}" added`));
+    }
+  }
+
+  /**
+   * Pivot: Skip all remaining stories
+   */
+  private async handlePivotSkipRest(): Promise<void> {
+    const { confirm } = await inquirer.prompt([{
+      type: 'confirm',
+      name: 'confirm',
+      message: 'Skip all remaining stories and end session?',
+      default: false,
+    }]);
+
+    if (confirm && this.state) {
+      this.state.status = 'completed';
+      console.log(chalk.yellow('Skipping remaining stories...'));
+    }
+  }
+
+  /**
+   * Pivot: Restart current story
+   */
+  private async handlePivotRestart(): Promise<void> {
+    if (!this.state?.currentStory) {
+      console.log(chalk.yellow('No current story to restart'));
+      return;
+    }
+
+    const { confirm } = await inquirer.prompt([{
+      type: 'confirm',
+      name: 'confirm',
+      message: `Restart story "${this.state.currentStory.title}"?`,
+      default: true,
+    }]);
+
+    if (confirm) {
+      // Reset the story to pending state
+      this.depManager.resetStory(this.state.currentStory.id);
+      console.log(chalk.green(`✓ Story "${this.state.currentStory.title}" will restart`));
+    }
   }
 }

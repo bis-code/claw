@@ -334,9 +334,101 @@ program
 program
   .command('resume [feature]')
   .description('Resume work on a feature from last checkpoint')
-  .action(async (feature) => {
-    console.log(chalk.blue(`📂 Resuming${feature ? `: ${feature}` : '...'}}`));
-    console.log(chalk.yellow('Not yet implemented - Epic 4, Story 4.4'));
+  .option('--hours <hours>', 'Time budget in hours', parseFloat)
+  .option('--stories <count>', 'Max stories to complete', parseInt)
+  .option('--model <model>', 'Claude model to use', 'sonnet')
+  .action(async (featureArg, options) => {
+    const { Workspace } = await import('../core/workspace.js');
+    const { FeatureManager } = await import('../core/feature.js');
+    const { SessionRunner } = await import('../core/session.js');
+    const { CheckpointManager } = await import('../core/checkpoint.js');
+
+    const workspace = new Workspace(process.cwd());
+    const config = await workspace.load();
+
+    if (!config) {
+      console.log(chalk.red('✗ Workspace not initialized. Run `claw init` first.'));
+      process.exit(1);
+    }
+
+    const vaultPath = config.obsidian?.vault || '~/Documents/Obsidian';
+    const projectPath = config.obsidian?.project || `Projects/${config.name}`;
+    const featureManager = new FeatureManager(vaultPath, projectPath);
+    const checkpointManager = new CheckpointManager(vaultPath, projectPath);
+
+    // Find feature with checkpoint
+    let featureId = featureArg;
+
+    if (!featureId) {
+      // List features with checkpoints
+      const features = await featureManager.list();
+      const resumable: { id: string; title: string; checkpoint: import('../core/checkpoint.js').CheckpointData }[] = [];
+
+      for (const f of features) {
+        const checkpoint = await checkpointManager.loadCheckpoint(f.id);
+        if (checkpoint && checkpointManager.isResumable(checkpoint)) {
+          resumable.push({ id: f.id, title: f.title, checkpoint });
+        }
+      }
+
+      if (resumable.length === 0) {
+        console.log(chalk.yellow('No resumable sessions found.'));
+        console.log(chalk.dim('Start a new session with: claw run <feature>'));
+        process.exit(0);
+      }
+
+      if (resumable.length === 1) {
+        featureId = resumable[0].id;
+        console.log(chalk.blue(`Found 1 resumable session: "${resumable[0].title}"`));
+      } else {
+        // Multiple resumable sessions - prompt user
+        const inquirer = await import('inquirer');
+        const { selected } = await inquirer.default.prompt([{
+          type: 'list',
+          name: 'selected',
+          message: 'Select session to resume:',
+          choices: resumable.map(r => ({
+            name: `${r.title} (${r.checkpoint.sessionState.storiesCompleted}/${Object.keys(r.checkpoint.storyProgress).length} stories)`,
+            value: r.id,
+          })),
+        }]);
+        featureId = selected;
+      }
+    }
+
+    // Load feature and checkpoint
+    const feature = await featureManager.get(featureId);
+    if (!feature) {
+      console.log(chalk.red(`✗ Feature not found: ${featureId}`));
+      process.exit(1);
+    }
+
+    const checkpoint = await checkpointManager.loadCheckpoint(featureId);
+    if (!checkpoint) {
+      console.log(chalk.yellow(`No checkpoint found for "${feature.title}".`));
+      console.log(chalk.dim('Starting fresh session instead.'));
+    } else {
+      console.log(chalk.blue(`\n📂 Resuming: "${feature.title}"`));
+      console.log(chalk.dim(`   Previous status: ${checkpoint.sessionState.status}`));
+      console.log(chalk.dim(`   Stories completed: ${checkpoint.sessionState.storiesCompleted}`));
+      console.log(chalk.dim(`   Remaining time: ${checkpointManager.getRemainingTime(checkpoint).toFixed(1)}h`));
+    }
+
+    // Create session runner and resume
+    const sessionRunner = new SessionRunner(process.cwd(), vaultPath, projectPath);
+    const result = await sessionRunner.resume(feature, {
+      maxHours: options.hours,
+      maxStories: options.stories,
+      model: options.model,
+    });
+
+    if (result.success) {
+      console.log(chalk.green('\n✓ Session completed successfully!'));
+      process.exit(0);
+    } else {
+      console.log(chalk.yellow(`\nSession ended: ${result.error || 'incomplete'}`));
+      process.exit(1);
+    }
   });
 
 // claw status - Show current state
@@ -516,6 +608,151 @@ program
     } else {
       console.log(chalk.dim(`\nTotal: ${totalFindings} findings`));
       console.log(chalk.dim('Run `claw feature` to create stories from these findings.'));
+    }
+  });
+
+// claw validate - Validate workspace configuration
+program
+  .command('validate')
+  .description('Validate workspace configuration and features')
+  .option('-f, --feature <id>', 'Validate a specific feature')
+  .action(async (options) => {
+    const { Workspace } = await import('../core/workspace.js');
+    const { FeatureManager } = await import('../core/feature.js');
+    const {
+      validateWorkspaceConfig,
+      validateFeature,
+      formatValidationResult,
+    } = await import('../core/validation.js');
+
+    console.log(chalk.blue('🔍 Validating configuration...\n'));
+
+    // Validate workspace
+    const workspace = new Workspace(process.cwd());
+    const config = await workspace.load();
+
+    if (!config) {
+      console.log(chalk.red('✗ Workspace not initialized. Run `claw init` first.'));
+      process.exit(1);
+    }
+
+    console.log(chalk.bold('Workspace Configuration:'));
+    const workspaceResult = validateWorkspaceConfig(config);
+    console.log(formatValidationResult(workspaceResult));
+
+    // Validate specific feature or all features
+    if (options.feature) {
+      const featureManager = new FeatureManager(
+        config.obsidian?.vault || '~/Documents/Obsidian',
+        config.obsidian?.project || `Projects/${config.name}`
+      );
+
+      const feature = await featureManager.get(options.feature);
+      if (!feature) {
+        console.log(chalk.red(`\n✗ Feature not found: ${options.feature}`));
+        process.exit(1);
+      }
+
+      console.log(chalk.bold(`\nFeature: ${feature.title}`));
+      const featureResult = validateFeature(feature);
+      console.log(formatValidationResult(featureResult));
+
+      if (!workspaceResult.valid || !featureResult.valid) {
+        process.exit(1);
+      }
+    } else if (!workspaceResult.valid) {
+      process.exit(1);
+    }
+
+    console.log(chalk.green('\n✓ Validation complete'));
+  });
+
+// claw doctor - Diagnose common issues
+program
+  .command('doctor')
+  .description('Diagnose common setup issues')
+  .action(async () => {
+    console.log(chalk.blue('🩺 Running diagnostics...\n'));
+
+    const checks: { name: string; check: () => Promise<boolean>; fix?: string }[] = [
+      {
+        name: 'Git installed',
+        check: async () => {
+          try {
+            const { execSync } = await import('child_process');
+            execSync('git --version', { stdio: 'pipe' });
+            return true;
+          } catch { return false; }
+        },
+        fix: 'Install git from https://git-scm.com',
+      },
+      {
+        name: 'Claude CLI (claude) installed',
+        check: async () => {
+          try {
+            const { execSync } = await import('child_process');
+            execSync('which claude', { stdio: 'pipe' });
+            return true;
+          } catch { return false; }
+        },
+        fix: 'Install Claude CLI: npm install -g @anthropic-ai/claude-code',
+      },
+      {
+        name: 'GitHub CLI (gh) installed',
+        check: async () => {
+          try {
+            const { execSync } = await import('child_process');
+            execSync('which gh', { stdio: 'pipe' });
+            return true;
+          } catch { return false; }
+        },
+        fix: 'Install GitHub CLI: brew install gh',
+      },
+      {
+        name: 'Workspace initialized',
+        check: async () => {
+          const { existsSync } = await import('fs');
+          return existsSync('claw-workspace.json');
+        },
+        fix: 'Run: claw init',
+      },
+      {
+        name: 'Obsidian vault accessible',
+        check: async () => {
+          try {
+            const { existsSync } = await import('fs');
+            const { Workspace } = await import('../core/workspace.js');
+            const workspace = new Workspace(process.cwd());
+            const config = await workspace.load();
+            if (!config?.obsidian?.vault) return false;
+            const vaultPath = config.obsidian.vault.replace('~', process.env.HOME || '');
+            return existsSync(vaultPath);
+          } catch { return false; }
+        },
+        fix: 'Check obsidian.vault path in claw-workspace.json',
+      },
+    ];
+
+    let allPassed = true;
+    for (const { name, check, fix } of checks) {
+      const passed = await check();
+      if (passed) {
+        console.log(chalk.green(`  ✓ ${name}`));
+      } else {
+        console.log(chalk.red(`  ✗ ${name}`));
+        if (fix) {
+          console.log(chalk.dim(`    → ${fix}`));
+        }
+        allPassed = false;
+      }
+    }
+
+    console.log('');
+    if (allPassed) {
+      console.log(chalk.green('All checks passed!'));
+    } else {
+      console.log(chalk.yellow('Some checks failed. Please fix the issues above.'));
+      process.exit(1);
     }
   });
 

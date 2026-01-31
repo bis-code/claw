@@ -1,13 +1,19 @@
 {
   "name": "@bis-code/claw",
-  "version": "2.0.0-alpha.0",
+  "version": "2.0.0-alpha.1",
   "description": "Claude Automated Workflow - Orchestration layer for autonomous AI development",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
+    "claw": "dist/cli/index.js",
     "claw-v2": "dist/cli/index.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
