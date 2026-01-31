@@ -1,3 +1,8 @@
+# Node.js
+node_modules/
+dist/
+*.tgz
+
 # Test dependencies (cloned during setup)
 tests/bats/
 tests/test_helper/bats-support/
