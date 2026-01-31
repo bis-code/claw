@@ -108,8 +108,45 @@ program
   .option('--skip-discovery', 'Skip discovery phase')
   .option('--hours <n>', 'Time budget in hours', '4')
   .action(async (desc, options) => {
-    console.log(chalk.blue(`📋 Feature: "${desc}"`));
-    console.log(chalk.yellow('Not yet implemented - Epic 2'));
+    const { Workspace } = await import('../core/workspace.js');
+    const { FeatureManager } = await import('../core/feature.js');
+    const ora = (await import('ora')).default;
+
+    // Load workspace config
+    const workspace = new Workspace(process.cwd());
+    const config = await workspace.load();
+
+    if (!config) {
+      console.log(chalk.red('✗ Workspace not initialized. Run `claw init` first.'));
+      process.exit(1);
+    }
+
+    // Initialize feature manager
+    const featureManager = new FeatureManager(
+      config.obsidian?.vault || '~/Documents/Obsidian',
+      config.obsidian?.project || `Projects/${config.name}`
+    );
+
+    // Create feature
+    const spinner = ora(`Creating feature: "${desc}"`).start();
+    const feature = await featureManager.create(desc);
+    spinner.succeed(`Feature created: ${feature.id}`);
+
+    console.log('\n' + chalk.blue('📋 Feature Overview:') + '\n');
+    console.log(`  Title: ${feature.title}`);
+    console.log(`  Status: ${feature.status}`);
+    console.log(`  Stories: ${feature.stories.length}`);
+    console.log(`  Obsidian: ${config.obsidian?.project}/features/${feature.id}/_overview.md`);
+
+    if (options.planOnly) {
+      console.log(chalk.dim('\n--plan-only specified. Stopping here.'));
+      console.log(chalk.dim('Run `claw run` to execute, or `claw feature` again for interactive breakdown (Epic 2).'));
+      return;
+    }
+
+    // For now, just show that execution would happen
+    console.log(chalk.yellow('\n⚠️  Autonomous execution not yet implemented (Epic 3).'));
+    console.log(chalk.dim('Run `claw run` when ready, or wait for Epic 3 implementation.'));
   });
 
 // claw run - Execute pending stories
@@ -137,9 +174,58 @@ program
 program
   .command('status [feature]')
   .description('Show workspace or feature status')
-  .action(async (feature) => {
-    console.log(chalk.blue('📊 Status'));
-    console.log(chalk.yellow('Not yet implemented'));
+  .action(async (featureId) => {
+    const { Workspace } = await import('../core/workspace.js');
+    const { FeatureManager } = await import('../core/feature.js');
+
+    const workspace = new Workspace(process.cwd());
+    const config = await workspace.load();
+
+    if (!config) {
+      console.log(chalk.red('✗ Workspace not initialized. Run `claw init` first.'));
+      process.exit(1);
+    }
+
+    const featureManager = new FeatureManager(
+      config.obsidian?.vault || '~/Documents/Obsidian',
+      config.obsidian?.project || `Projects/${config.name}`
+    );
+
+    if (featureId) {
+      // Show specific feature
+      const feature = await featureManager.get(featureId);
+      if (!feature) {
+        console.log(chalk.red(`✗ Feature not found: ${featureId}`));
+        process.exit(1);
+      }
+
+      console.log(chalk.blue(`\n📋 Feature: ${feature.title}\n`));
+      console.log(`  ID: ${feature.id}`);
+      console.log(`  Status: ${feature.status}`);
+      console.log(`  Created: ${feature.createdAt.toISOString()}`);
+      console.log('\n  Stories:');
+      for (const story of feature.stories) {
+        const emoji = { pending: '⏳', in_progress: '🔄', complete: '✅', blocked: '🚫', skipped: '⏭️' }[story.status];
+        console.log(`    ${emoji} ${story.id}. ${story.title} (${story.status})`);
+      }
+    } else {
+      // Show workspace overview
+      console.log(chalk.blue(`\n📊 Workspace: ${config.name}\n`));
+      console.log(`  Repos: ${config.repos.length}`);
+      for (const repo of config.repos) {
+        console.log(`    - ${repo.name} (${repo.type})`);
+      }
+
+      const features = await featureManager.list();
+      console.log(`\n  Features: ${features.length}`);
+      for (const f of features.slice(0, 5)) {
+        const emoji = { planning: '📝', executing: '🔄', complete: '✅', paused: '⏸️' }[f.status];
+        console.log(`    ${emoji} ${f.id} - ${f.title}`);
+      }
+      if (features.length > 5) {
+        console.log(chalk.dim(`    ... and ${features.length - 5} more`));
+      }
+    }
   });
 
 // claw list - List all features
@@ -148,8 +234,37 @@ program
   .alias('ls')
   .description('List all features and their status')
   .action(async () => {
-    console.log(chalk.blue('📋 Features'));
-    console.log(chalk.yellow('Not yet implemented'));
+    const { Workspace } = await import('../core/workspace.js');
+    const { FeatureManager } = await import('../core/feature.js');
+
+    const workspace = new Workspace(process.cwd());
+    const config = await workspace.load();
+
+    if (!config) {
+      console.log(chalk.red('✗ Workspace not initialized. Run `claw init` first.'));
+      process.exit(1);
+    }
+
+    const featureManager = new FeatureManager(
+      config.obsidian?.vault || '~/Documents/Obsidian',
+      config.obsidian?.project || `Projects/${config.name}`
+    );
+
+    const features = await featureManager.list();
+
+    if (features.length === 0) {
+      console.log(chalk.dim('No features yet. Run `claw feature "description"` to create one.'));
+      return;
+    }
+
+    console.log(chalk.blue('\n📋 Features\n'));
+
+    for (const f of features) {
+      const emoji = { planning: '📝', executing: '🔄', complete: '✅', paused: '⏸️' }[f.status];
+      const progress = `${f.stories.filter(s => s.status === 'complete').length}/${f.stories.length}`;
+      console.log(`  ${emoji} ${f.id}`);
+      console.log(chalk.dim(`     ${f.title} (${progress} stories)`));
+    }
   });
 
 // claw pivot - Pivot menu
