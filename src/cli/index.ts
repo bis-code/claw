@@ -106,10 +106,14 @@ program
   .description('Start a new feature (interactive planning → autonomous execution)')
   .option('--plan-only', 'Only plan, do not execute')
   .option('--skip-discovery', 'Skip discovery phase')
+  .option('--skip-breakdown', 'Skip interactive breakdown, create single story')
   .option('--hours <n>', 'Time budget in hours', '4')
   .action(async (desc, options) => {
     const { Workspace } = await import('../core/workspace.js');
     const { FeatureManager } = await import('../core/feature.js');
+    const { BreakdownGenerator } = await import('../core/breakdown.js');
+    const { DiscoveryEngine } = await import('../core/discovery.js');
+    const inquirer = await import('inquirer');
     const ora = (await import('ora')).default;
 
     // Load workspace config
@@ -121,32 +125,108 @@ program
       process.exit(1);
     }
 
-    // Initialize feature manager
-    const featureManager = new FeatureManager(
-      config.obsidian?.vault || '~/Documents/Obsidian',
-      config.obsidian?.project || `Projects/${config.name}`
-    );
+    console.log(chalk.blue(`\n📋 Feature: "${desc}"\n`));
 
-    // Create feature
-    const spinner = ora(`Creating feature: "${desc}"`).start();
-    const feature = await featureManager.create(desc);
-    spinner.succeed(`Feature created: ${feature.id}`);
+    // Run discovery unless skipped
+    let findings;
+    if (!options.skipDiscovery) {
+      const discoverySpinner = ora('Running discovery...').start();
+      const discoveryEngine = new DiscoveryEngine(process.cwd());
+      const results = await discoveryEngine.runDiscovery({
+        mode: 'shallow',
+        repos: config.repos,
+      });
+      findings = results.flatMap(r => r.findings);
+      discoverySpinner.succeed(`Discovery complete: ${findings.length} findings`);
+    }
 
-    console.log('\n' + chalk.blue('📋 Feature Overview:') + '\n');
-    console.log(`  Title: ${feature.title}`);
-    console.log(`  Status: ${feature.status}`);
-    console.log(`  Stories: ${feature.stories.length}`);
-    console.log(`  Obsidian: ${config.obsidian?.project}/features/${feature.id}/_overview.md`);
+    // Generate breakdown options unless skipped
+    if (!options.skipBreakdown) {
+      const breakdownSpinner = ora('Generating breakdown options...').start();
+      const breakdownGenerator = new BreakdownGenerator(process.cwd());
+
+      const approaches = await breakdownGenerator.generateApproaches({
+        featureTitle: desc,
+        featureDescription: desc,
+        repos: config.repos,
+        findings,
+      });
+      breakdownSpinner.succeed(`Generated ${approaches.length} approaches`);
+
+      // Display approaches
+      console.log(chalk.blue('\n💬 How should we structure this feature?\n'));
+
+      for (let i = 0; i < approaches.length; i++) {
+        const a = approaches[i];
+        const marker = a.recommended ? chalk.green(' (Recommended)') : '';
+        console.log(chalk.bold(`[${i + 1}] ${a.name}${marker}`));
+        console.log(chalk.dim(`    ${a.description}`));
+        console.log(chalk.dim(`    Stories: ${a.stories.length}, Est: ${a.estimatedHours}h`));
+        console.log('');
+      }
+
+      // Let user select
+      const { approachIndex } = await inquirer.default.prompt([{
+        type: 'list',
+        name: 'approachIndex',
+        message: 'Select an approach:',
+        choices: [
+          ...approaches.map((a, i) => ({
+            name: `${a.name}${a.recommended ? ' (Recommended)' : ''} - ${a.stories.length} stories`,
+            value: i,
+          })),
+          { name: 'Custom breakdown...', value: -1 },
+        ],
+      }]);
+
+      if (approachIndex === -1) {
+        console.log(chalk.yellow('Custom breakdown not yet implemented. Using first approach.'));
+      }
+
+      const selectedApproach = approaches[approachIndex >= 0 ? approachIndex : 0];
+      console.log(chalk.green(`\n✓ Selected: ${selectedApproach.name}\n`));
+
+      // Show stories
+      console.log(chalk.blue('Stories:'));
+      for (const story of selectedApproach.stories) {
+        console.log(`  ${chalk.dim('•')} ${story.title} (${story.estimatedHours}h)`);
+        if (story.dependsOn && story.dependsOn.length > 0) {
+          console.log(chalk.dim(`      Depends on: ${story.dependsOn.join(', ')}`));
+        }
+      }
+
+      // Initialize feature manager and create feature with stories
+      const featureManager = new FeatureManager(
+        config.obsidian?.vault || '~/Documents/Obsidian',
+        config.obsidian?.project || `Projects/${config.name}`
+      );
+
+      const feature = await featureManager.create(desc);
+
+      // Update with selected stories (simplified - would need to update feature.ts)
+      console.log(chalk.green(`\n✓ Feature created: ${feature.id}`));
+      console.log(chalk.dim(`  Obsidian: ${config.obsidian?.project}/features/${feature.id}/_overview.md`));
+
+    } else {
+      // Simple single-story feature
+      const featureManager = new FeatureManager(
+        config.obsidian?.vault || '~/Documents/Obsidian',
+        config.obsidian?.project || `Projects/${config.name}`
+      );
+
+      const feature = await featureManager.create(desc);
+      console.log(chalk.green(`✓ Feature created: ${feature.id}`));
+    }
 
     if (options.planOnly) {
       console.log(chalk.dim('\n--plan-only specified. Stopping here.'));
-      console.log(chalk.dim('Run `claw run` to execute, or `claw feature` again for interactive breakdown (Epic 2).'));
+      console.log(chalk.dim('Run `claw run` to execute.'));
       return;
     }
 
-    // For now, just show that execution would happen
+    // Execution would happen here (Epic 3)
     console.log(chalk.yellow('\n⚠️  Autonomous execution not yet implemented (Epic 3).'));
-    console.log(chalk.dim('Run `claw run` when ready, or wait for Epic 3 implementation.'));
+    console.log(chalk.dim('Run `claw run` when ready.'));
   });
 
 // claw run - Execute pending stories

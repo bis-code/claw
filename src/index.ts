@@ -6,6 +6,7 @@ export { Workspace, type WorkspaceConfig, type Repo, type RepoRelationship } fro
 export { FeatureManager, type Feature, type Story, type StoryStatus, type BreakdownOption } from './core/feature.js';
 export { SessionRunner, type SessionConfig, type SessionResult, type SessionState } from './core/session.js';
 export { DiscoveryEngine, type DiscoveryResult, type Finding, type DiscoveryMode, type DiscoveryOptions } from './core/discovery.js';
+export { BreakdownGenerator, type BreakdownApproach, type ProposedStory, type BreakdownContext } from './core/breakdown.js';
 
 // Integrations
 export { ObsidianClient, type ObsidianNote } from './integrations/obsidian.js';
