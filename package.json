@@ -1,6 +1,6 @@
 {
   "name": "@bis-code/claw",
-  "version": "3.2.6",
+  "version": "3.2.7",
   "description": "Claude Automated Workflow - Orchestration layer for autonomous AI development",
   "type": "module",
   "main": "dist/index.js",

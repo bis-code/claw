@@ -1,3 +1,8 @@
+---
+name: claw-run
+description: Start a work session
+---
+
 # /claw-run
 
 Execute work items autonomously with verification and feedback loops.

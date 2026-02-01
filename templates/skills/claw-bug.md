@@ -1,3 +1,8 @@
+---
+name: claw-bug
+description: Report a bug
+---
+
 # /claw-bug
 
 Create a bug report in Obsidian (and GitHub in team mode).

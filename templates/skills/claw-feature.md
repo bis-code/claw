@@ -1,3 +1,8 @@
+---
+name: claw-feature
+description: Propose a new feature
+---
+
 # /claw-feature
 
 Create a feature request in Obsidian (and GitHub in team mode).
