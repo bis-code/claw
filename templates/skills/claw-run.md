@@ -177,3 +177,31 @@ When working on an item, check which app it affects and use the appropriate conf
 3. Use `devCommand` to start the dev server
 4. Use `devUrl` for E2E tests or manual verification
 5. Run from `path` directory if not root
+
+## Verification Screenshots
+
+**After completing each item, offer to capture a verification screenshot:**
+
+1. When tests pass and implementation is verified:
+   - Ask: "Want to add a screenshot showing this working?"
+
+2. If user pastes an image:
+   - Read the pasted image path (shown when pasted)
+   - Generate filename: `<type>-<slug>-done-<timestamp>.png`
+   - Copy to Obsidian: `<vault>/<project>/attachments/`
+   - Update the original note with a "## Verification" section
+
+3. **Image handling:**
+   ```bash
+   cp "/var/folders/.../paste-XXX.png" "~/Documents/Obsidian/Projects/<project>/attachments/<filename>.png"
+   ```
+
+4. **Update the Obsidian note:**
+   - Add `## Verification` section if not present
+   - Add `![[attachments/<filename>.png]]`
+   - Update status to "completed"
+
+This creates visual documentation that the fix/feature works, valuable for:
+- Future debugging (what did it look like when working?)
+- PR reviews (screenshots in description)
+- Knowledge base (documented solutions)

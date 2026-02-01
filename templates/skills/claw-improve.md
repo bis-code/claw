@@ -5,8 +5,8 @@ Create an improvement (refactor, tech-debt, performance, coverage) in Obsidian.
 ## Usage
 
 ```
-/new-improvement
-/new-improvement "Refactor auth module to use middleware pattern"
+/claw-improve
+/claw-improve "Refactor auth module to use middleware pattern"
 ```
 
 ## Scope
@@ -31,15 +31,52 @@ Improvements cover non-feature, non-bug work:
 3. **Clarify approach** (for refactors)
    - Ask: "What's the target state?"
 
-4. **Create in Obsidian**
+4. **Reference image** (optional, category-specific)
+   - Refactors: "Have an architecture diagram? (paste or 'skip')"
+   - Performance: "Have a before screenshot/benchmark? (paste or 'skip')"
+   - See "Image Handling" section below
+
+5. **Create in Obsidian**
    - Path: `improvements/<slug>.md`
    - Use note format below
 
-5. **Team mode: Create GitHub issue**
+6. **Team mode: Create GitHub issue**
    - If `config.mode === 'team'`:
      - Create issue with label from `config.github.labels.improvement`
      - Add link to Obsidian note in issue body
      - Add issue number to Obsidian note
+
+## Image Handling
+
+When user pastes an image or provides a path:
+
+1. **Read the image** using the Read tool to verify it's valid
+2. **Generate filename**: `improve-<slug>-<type>-<timestamp>.png`
+   - Types: `before`, `after`, `diagram`, `benchmark`
+3. **Copy to Obsidian attachments**:
+   - Target: `<vault>/<project>/attachments/<filename>`
+   - Use Bash: `cp "<source>" "<target>"`
+4. **Reference in note**: `![[attachments/<filename>]]`
+
+**Pasted images** appear as temporary files (e.g., `/var/folders/.../paste-XXX.png`).
+The path is shown when user pastes - use that path to copy the file.
+
+## After Implementation - Verification
+
+When an improvement is completed:
+
+**For performance improvements:**
+- Ask: "Want to add an 'after' benchmark/screenshot?"
+- Save as `improve-<slug>-after-<timestamp>.png`
+- Show before/after comparison in the note
+
+**For refactors:**
+- Ask: "Want to add a screenshot of the new architecture?"
+- Document the improvement visually
+
+**For all categories:**
+- Update note status to "completed"
+- Add verification section with any screenshots
 
 ## Improvement Note Format
 
@@ -58,6 +95,8 @@ Improvements cover non-feature, non-bug work:
 ## Current State
 
 <how it works now, what's wrong>
+
+![[attachments/improve-<slug>-before-<timestamp>.png]]
 
 ## Target State
 
@@ -81,6 +120,13 @@ Improvements cover non-feature, non-bug work:
 - [ ] No behavior change (for refactors)
 - [ ] Performance measured (for optimizations)
 
+### Before/After
+
+<!-- Added after completion -->
+| Before | After |
+|--------|-------|
+| ![[attachments/improve-<slug>-before.png]] | ![[attachments/improve-<slug>-after.png]] |
+
 ## Notes
 
 <additional context>
@@ -93,6 +139,7 @@ Improvements cover non-feature, non-bug work:
 - Tests should pass before and after
 - Often enables future features
 - Example: "Extract payment logic into PaymentService"
+- **Images:** Architecture diagrams helpful
 
 ### Tech-Debt
 - Fixing past shortcuts
@@ -105,19 +152,19 @@ Improvements cover non-feature, non-bug work:
 - Profile before and after
 - Consider trade-offs
 - Example: "Add Redis caching for user sessions"
+- **Images:** Before/after benchmarks critical
 
 ### Coverage
 - Identify missing tests
 - Focus on critical paths
 - Don't test for coverage sake
 - Example: "Add E2E tests for checkout flow"
+- **Images:** Coverage reports helpful
 
 ## Configuration
 
 From `.claw/config.json`:
 - `mode`: 'solo' or 'team'
-- `create.obsidian`: always true
-- `create.github`: true in team mode
-- `github.labels.improvement`: label for improvement issues
 - `obsidian.vault`: path to vault
 - `obsidian.project`: project folder in vault
+- `github.labels.improvement`: label for improvement issues (team mode)
