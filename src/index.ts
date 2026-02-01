@@ -24,6 +24,16 @@ export {
   type ValidationError,
   type ValidationWarning,
 } from './core/validation.js';
+export {
+  convertFile,
+  scanForConvertible,
+  isConvertible,
+  parseMarkdownToStories,
+  generateOverviewContent,
+  type ConversionResult,
+  type ConvertedStory,
+  type ConversionOptions,
+} from './core/converter.js';
 
 // Integrations
 export { ObsidianClient, type ObsidianNote } from './integrations/obsidian.js';

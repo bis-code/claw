@@ -756,5 +756,183 @@ program
     }
   });
 
+// claw migrate - Convert existing markdown files to claw features
+program
+  .command('migrate [path]')
+  .description('Migrate existing markdown files to claw feature format')
+  .option('--dry-run', 'Preview changes without writing files')
+  .option('--auto', 'Skip interactive prompts, convert all convertible files')
+  .action(async (pathArg, options) => {
+    const inquirerModule = await import('inquirer');
+    const inquirerPrompt = inquirerModule.default.prompt;
+    const { Workspace } = await import('../core/workspace.js');
+    const {
+      scanForConvertible,
+      isConvertible,
+      parseMarkdownToStories,
+      convertFile,
+    } = await import('../core/converter.js');
+    const { readFile } = await import('fs/promises');
+    const { join, basename, dirname } = await import('path');
+    const { homedir } = await import('os');
+
+    const workspace = new Workspace(process.cwd());
+    const config = await workspace.load();
+
+    if (!config) {
+      console.log(chalk.red('✗ Workspace not initialized. Run `claw init` first.'));
+      process.exit(1);
+    }
+
+    const vaultPath = (config.obsidian?.vault || '~/Documents/Obsidian').replace('~', homedir());
+    const projectPath = config.obsidian?.project || `Projects/${config.name}`;
+    const obsidianProjectDir = join(vaultPath, projectPath);
+    const featuresDir = join(obsidianProjectDir, 'features');
+
+    console.log(chalk.blue('🔄 Scanning for convertible files...\n'));
+
+    // Determine scan path
+    const scanPath = pathArg
+      ? (pathArg.startsWith('/') ? pathArg : join(obsidianProjectDir, pathArg))
+      : obsidianProjectDir;
+
+    const convertibleFiles = await scanForConvertible(scanPath);
+
+    if (convertibleFiles.length === 0) {
+      console.log(chalk.yellow('No convertible files found.'));
+      console.log(chalk.dim('Convertible files contain task lists (- [ ]) or priority tables.'));
+      process.exit(0);
+    }
+
+    console.log(chalk.green(`Found ${convertibleFiles.length} convertible file(s):\n`));
+
+    const conversions: { file: string; action: string; featureId?: string }[] = [];
+
+    for (const filePath of convertibleFiles) {
+      const content = await readFile(filePath, 'utf-8');
+      const filename = basename(filePath);
+      const relativePath = filePath.replace(obsidianProjectDir + '/', '');
+
+      // Parse to show preview
+      const { title, stories, completedItems, deferredItems } = parseMarkdownToStories(content, filename);
+      const pendingCount = stories.filter(s => s.status === 'pending').length;
+
+      console.log(chalk.bold(`📄 ${relativePath}`));
+      console.log(chalk.dim(`   Title: ${title}`));
+      console.log(chalk.dim(`   Pending: ${pendingCount} | Completed: ${completedItems.length} | Deferred: ${deferredItems.length}`));
+
+      if (pendingCount > 0) {
+        console.log(chalk.cyan('   Stories to create:'));
+        stories.filter(s => s.status === 'pending').slice(0, 5).forEach(s => {
+          console.log(chalk.dim(`     - ${s.title}`));
+        });
+        if (pendingCount > 5) {
+          console.log(chalk.dim(`     ... and ${pendingCount - 5} more`));
+        }
+      }
+
+      if (options.auto) {
+        // Auto mode - convert all
+        conversions.push({ file: filePath, action: 'convert' });
+        console.log(chalk.green('   → Will convert to feature\n'));
+      } else {
+        // Interactive mode
+        const { action } = await inquirerPrompt([{
+          type: 'list',
+          name: 'action',
+          message: 'What should we do with this file?',
+          choices: [
+            { name: '✓ Convert to claw feature', value: 'convert' },
+            { name: '📁 Move to specific folder (documentation)', value: 'move' },
+            { name: '⏭️  Skip (leave as-is)', value: 'skip' },
+          ],
+        }]);
+
+        if (action === 'convert') {
+          const { featureId } = await inquirerPrompt([{
+            type: 'input',
+            name: 'featureId',
+            message: 'Feature ID (folder name):',
+            default: basename(filename, '.md').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          }]);
+          conversions.push({ file: filePath, action: 'convert', featureId });
+        } else if (action === 'move') {
+          const { folder } = await inquirerPrompt([{
+            type: 'input',
+            name: 'folder',
+            message: 'Destination folder (relative to project):',
+            default: 'docs',
+          }]);
+          conversions.push({ file: filePath, action: 'move', featureId: folder });
+        } else {
+          conversions.push({ file: filePath, action: 'skip' });
+        }
+        console.log('');
+      }
+    }
+
+    // Summary
+    const toConvert = conversions.filter(c => c.action === 'convert');
+    const toMove = conversions.filter(c => c.action === 'move');
+    const toSkip = conversions.filter(c => c.action === 'skip');
+
+    console.log(chalk.blue('\n📋 Migration Summary'));
+    console.log(`   Convert to features: ${toConvert.length}`);
+    console.log(`   Move to folders: ${toMove.length}`);
+    console.log(`   Skip: ${toSkip.length}`);
+
+    if (options.dryRun) {
+      console.log(chalk.yellow('\n⚠️  Dry run - no files were modified.'));
+      console.log(chalk.dim('Remove --dry-run to apply changes.'));
+      process.exit(0);
+    }
+
+    if (toConvert.length === 0 && toMove.length === 0) {
+      console.log(chalk.dim('\nNothing to do.'));
+      process.exit(0);
+    }
+
+    // Execute conversions
+    console.log(chalk.blue('\n🔄 Applying changes...\n'));
+
+    for (const conv of toConvert) {
+      const result = await convertFile(conv.file, featuresDir, {
+        archive: true,
+        featureId: conv.featureId,
+      });
+
+      if (result.success) {
+        console.log(chalk.green(`✓ Converted: ${basename(conv.file)} → features/${result.featureId}/`));
+      } else {
+        console.log(chalk.red(`✗ Failed: ${basename(conv.file)} - ${result.error}`));
+      }
+    }
+
+    for (const conv of toMove) {
+      try {
+        const { rename, mkdir } = await import('fs/promises');
+        const destDir = join(obsidianProjectDir, conv.featureId || 'docs');
+        const { existsSync } = await import('fs');
+        if (!existsSync(destDir)) {
+          await mkdir(destDir, { recursive: true });
+        }
+        await rename(conv.file, join(destDir, basename(conv.file)));
+        console.log(chalk.green(`✓ Moved: ${basename(conv.file)} → ${conv.featureId}/`));
+      } catch (error) {
+        console.log(chalk.red(`✗ Failed to move: ${basename(conv.file)}`));
+      }
+    }
+
+    // Final instructions
+    console.log(chalk.green('\n✅ Migration complete!\n'));
+    console.log(chalk.bold('Next steps:'));
+    console.log(chalk.dim('  1. Review converted features:'));
+    console.log(`     ${chalk.cyan('claw list')}`);
+    console.log(chalk.dim('  2. Run a feature:'));
+    console.log(`     ${chalk.cyan('claw run <feature-id> --hours 4')}`);
+    console.log(chalk.dim('  3. Check feature status:'));
+    console.log(`     ${chalk.cyan('claw status <feature-id>')}`);
+  });
+
 // Parse and run
 program.parse();
