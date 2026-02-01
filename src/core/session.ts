@@ -13,8 +13,8 @@ import { CheckpointManager } from './checkpoint.js';
 import { HotkeyManager } from './hotkeys.js';
 
 export interface SessionConfig {
-  /** Maximum hours to run */
-  maxHours: number;
+  /** Maximum hours to run (undefined = no limit) */
+  maxHours?: number;
   /** Maximum stories to complete */
   maxStories?: number;
   /** Stop at first blocker */
@@ -33,6 +33,8 @@ export interface SessionConfig {
   createPRPerStory?: boolean;
   /** Create PR after all stories complete */
   createPROnComplete?: boolean;
+  /** Run Claude interactively (user sees output and can interact) */
+  interactive?: boolean;
 }
 
 export interface SessionState {
@@ -131,10 +133,13 @@ export class SessionRunner {
     this.depManager.buildFromStories(feature.stories);
 
     console.log(chalk.blue(`\n🚀 Starting session: "${feature.title}"`));
-    console.log(chalk.dim(`   Budget: ${config.maxHours} hours`));
+    console.log(chalk.dim(`   Budget: ${config.maxHours ? `${config.maxHours} hours` : 'unlimited (until blocked)'}`));
     console.log(chalk.dim(`   Stories: ${feature.stories.length}`));
 
-    const deadline = new Date(startTime.getTime() + config.maxHours * 60 * 60 * 1000);
+    // If maxHours is undefined, no time limit (run until blocked or complete)
+    const deadline = config.maxHours
+      ? new Date(startTime.getTime() + config.maxHours * 60 * 60 * 1000)
+      : null;
 
     // Start listening for hotkeys
     this.hotkeyManager.start();
@@ -142,8 +147,8 @@ export class SessionRunner {
     try {
       // Main execution loop
       while (this.state.status === 'running') {
-        // Check time budget
-        if (new Date() >= deadline) {
+        // Check time budget (only if a deadline is set)
+        if (deadline && new Date() >= deadline) {
           console.log(chalk.yellow('\n⏰ Time budget exhausted'));
           this.state.status = 'timeout';
           break;
@@ -356,8 +361,6 @@ export class SessionRunner {
     featureTitle: string,
     config: SessionConfig
   ): Promise<ClaudeOutput> {
-    const spinner = ora(`Executing: ${story.title}`).start();
-
     // Build prompt
     const prompt = this.claude.generateStoryPrompt(
       {
@@ -368,7 +371,65 @@ export class SessionRunner {
       featureTitle
     );
 
-    // Spawn options
+    // Interactive mode: run Claude directly in terminal
+    if (config.interactive) {
+      // Display the story context so user knows what to work on
+      console.log(chalk.blue('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+      console.log(chalk.bold('📋 Story Context'));
+      console.log(chalk.blue('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+      console.log(chalk.yellow(`\nTitle: ${story.title}`));
+      console.log(chalk.dim(`Feature: ${featureTitle}`));
+      console.log(chalk.dim('\nScope:'));
+      story.scope.forEach(s => console.log(chalk.dim(`  - ${s}`)));
+      console.log(chalk.blue('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'));
+
+      console.log(chalk.green('Starting Claude... You can:'));
+      console.log(chalk.dim('  - Describe what you want Claude to do'));
+      console.log(chalk.dim('  - Answer Claude\'s questions'));
+      console.log(chalk.dim('  - Press Escape twice to exit when done'));
+      console.log(chalk.dim('\nThe story context is also saved to .claw-context.md\n'));
+
+      try {
+        const exitCode = await this.claude.runInteractive(prompt, {
+          model: config.model || 'sonnet',
+          dangerouslySkipPermissions: config.dangerouslySkipPermissions,
+          maxTurns: 50,
+        });
+
+        console.log(chalk.dim('\n--- Session ended ---'));
+
+        // Ask if story is complete
+        const { status } = await inquirer.prompt([{
+          type: 'list',
+          name: 'status',
+          message: 'Is this story complete?',
+          choices: [
+            { name: 'Yes, mark as complete', value: 'complete' },
+            { name: 'No, I\'m blocked', value: 'blocked' },
+            { name: 'Still in progress, continue later', value: 'in_progress' },
+          ],
+        }]);
+
+        return {
+          status: status as 'complete' | 'blocked' | 'error',
+          commits: [],
+          rawOutput: '',
+          exitCode,
+          blockerReason: status === 'blocked' ? 'User marked as blocked' : undefined,
+        };
+      } catch (error) {
+        return {
+          status: 'error',
+          commits: [],
+          rawOutput: '',
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
+
+    // Non-interactive mode: capture output with spinner
+    const spinner = ora(`Executing: ${story.title}`).start();
+
     const options: SpawnOptions = {
       model: config.model || 'sonnet',
       dangerouslySkipPermissions: config.dangerouslySkipPermissions,
@@ -570,8 +631,12 @@ ${commits.length > 20 ? `\n... and ${commits.length - 20} more` : ''}
     const resumeConfig: SessionConfig = {
       ...checkpoint.config as SessionConfig,
       ...config,
-      // Use remaining time budget
-      maxHours: config?.maxHours || this.checkpointManager.getRemainingTime(checkpoint),
+      // Preserve unlimited time if original session had no limit, otherwise use remaining time
+      maxHours: config?.maxHours !== undefined
+        ? config.maxHours
+        : (checkpoint.config.maxHours !== undefined
+            ? this.checkpointManager.getRemainingTime(checkpoint)
+            : undefined),
     };
 
     // Delete old checkpoint before starting fresh run

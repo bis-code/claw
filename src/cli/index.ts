@@ -611,24 +611,25 @@ program
     console.log(chalk.dim('Run `claw run` when ready.'));
   });
 
-// claw run - Execute pending stories
+// claw run - Interactive autonomous execution
 program
   .command('run [feature]')
-  .description('Run pending stories autonomously')
-  .option('--hours <n>', 'Time budget in hours', '4')
+  .description('Run pending stories autonomously (interactive mode)')
+  .option('--hours <n>', 'Time budget in hours (default: unlimited)')
   .option('--stories <n>', 'Max stories to complete')
-  .option('--until-blocked', 'Stop at first blocker')
-  .option('--pause-between', 'Pause between stories for review')
+  .option('--until-blocked', 'Stop at first blocker (default: true)', true)
   .option('--model <model>', 'Claude model to use (sonnet, opus, haiku)', 'sonnet')
-  .option('-y, --yes', 'Skip permission prompts')
-  .option('--retry', 'Enable iteration-until-green mode (retry on failure)')
-  .option('--max-retries <n>', 'Max retries per story', '5')
-  .option('--pr', 'Create PR after all stories complete')
-  .option('--pr-per-story', 'Create PR after each story (advanced)')
+  .option('-y, --yes', 'Skip interactive prompts, run all pending')
+  .option('--pr', 'Create PR after completion')
+  .option('-i, --interactive', 'Run Claude interactively (see output, can interact)', true)
+  .option('--no-interactive', 'Run in background mode (capture output)')
   .action(async (featureId, options) => {
     const { Workspace } = await import('../core/workspace.js');
     const { FeatureManager } = await import('../core/feature.js');
     const { SessionRunner } = await import('../core/session.js');
+    const { homedir } = await import('os');
+    const inquirerModule = await import('inquirer');
+    const inquirerPrompt = inquirerModule.default.prompt;
 
     const workspace = new Workspace(process.cwd());
     const config = await workspace.load();
@@ -638,55 +639,304 @@ program
       process.exit(1);
     }
 
-    const featureManager = new FeatureManager(
-      config.obsidian?.vault || '~/Documents/Obsidian',
-      config.obsidian?.project || `Projects/${config.name}`
+    const vaultPath = (config.obsidian?.vault || '~/Documents/Obsidian').replace('~', homedir());
+    const projectPath = config.obsidian?.project || `Projects/${config.name}`;
+    const featureManager = new FeatureManager(vaultPath, projectPath);
+
+    // Get all features
+    const allFeatures = await featureManager.list();
+    const featuresWithPending = allFeatures.filter(f =>
+      f.stories.some(s => s.status === 'pending' || s.status === 'in_progress')
     );
 
-    // Get feature to run
-    let feature;
+    if (featuresWithPending.length === 0 && !featureId) {
+      console.log(chalk.yellow('\n📭 No pending work found.\n'));
+
+      // Ask if they want to add something
+      const { addNew } = await inquirerPrompt([{
+        type: 'input',
+        name: 'addNew',
+        message: 'Add a new feature or bug? (leave empty to exit):',
+      }]);
+
+      if (addNew.trim()) {
+        const feature = await featureManager.create(addNew.trim());
+        console.log(chalk.green(`\n✓ Created: ${feature.title}`));
+        console.log(chalk.dim('Run `claw run` again to work on it.\n'));
+      }
+      return;
+    }
+
+    let selectedFeatures: typeof featuresWithPending = [];
+
+    // If specific feature provided, use it
     if (featureId) {
-      feature = await featureManager.get(featureId);
+      const feature = await featureManager.get(featureId);
       if (!feature) {
         console.log(chalk.red(`✗ Feature not found: ${featureId}`));
         process.exit(1);
       }
-    } else {
-      // Get most recent feature with pending stories
-      const features = await featureManager.list();
-      feature = features.find(f => f.status !== 'complete');
-      if (!feature) {
-        console.log(chalk.yellow('No features with pending stories.'));
-        console.log(chalk.dim('Run `claw feature "description"` to create one.'));
-        return;
+      selectedFeatures = [feature];
+    }
+    // If --yes flag, select all
+    else if (options.yes) {
+      selectedFeatures = featuresWithPending;
+    }
+    // Interactive mode
+    else {
+      console.log(chalk.blue('\n🤖 Claw - Autonomous Development\n'));
+
+      // Build flat list of all stories with their feature context
+      type StoryChoice = { feature: typeof featuresWithPending[0]; story: typeof featuresWithPending[0]['stories'][0] };
+      let allStories: StoryChoice[] = [];
+
+      for (const feature of allFeatures) {
+        for (const story of feature.stories) {
+          if (story.status === 'pending' || story.status === 'in_progress') {
+            allStories.push({ feature, story });
+          }
+        }
+      }
+
+      // Main interaction loop
+      let continueLoop = true;
+      let selectedStories: StoryChoice[] = [];
+
+      while (continueLoop) {
+        // Rebuild choices each iteration (in case stories were modified)
+        const storyChoices = allStories.map((item, idx) => {
+          const statusIcon = item.story.status === 'in_progress' ? '🔄' : '⏳';
+          const featureLabel = chalk.dim(`[${item.feature.title}]`);
+          return {
+            name: `${statusIcon} ${item.story.title} ${featureLabel}`,
+            value: idx,
+            checked: selectedStories.some(s => s.story.id === item.story.id && s.feature.id === item.feature.id),
+          };
+        });
+
+        // Add management options at the bottom
+        const allChoices: any[] = [
+          ...storyChoices,
+          new inquirerModule.default.Separator('─────────────────────────────────'),
+          { name: chalk.green('➕ Add new bug/feature'), value: 'add', checked: false },
+        ];
+
+        const { selected } = await inquirerPrompt([{
+          type: 'checkbox',
+          name: 'selected',
+          message: 'Select stories to work on:',
+          choices: allChoices,
+          pageSize: 15,
+        }]);
+
+        // Handle 'add' option
+        if (selected.includes('add')) {
+          const { newWork } = await inquirerPrompt([{
+            type: 'input',
+            name: 'newWork',
+            message: 'Describe the bug or feature:',
+          }]);
+
+          if (newWork.trim()) {
+            const isBug = /bug|fix|broken|error|crash|issue/i.test(newWork);
+
+            if (isBug) {
+              let bugsFeature = await featureManager.get('bugs');
+              if (!bugsFeature) {
+                bugsFeature = await featureManager.create('Bug Tracking', { id: 'bugs' });
+              }
+              const storyId = String(bugsFeature.stories.length + 1);
+              const newStory = {
+                id: storyId,
+                title: newWork.trim(),
+                status: 'pending' as const,
+                scope: [newWork.trim()],
+                repos: [],
+              };
+              bugsFeature.stories.push(newStory);
+              await featureManager.update(bugsFeature);
+              allStories.push({ feature: bugsFeature, story: newStory });
+              console.log(chalk.green(`  ✓ Added bug: "${newWork.trim()}"`));
+            } else {
+              const newFeature = await featureManager.create(newWork.trim());
+              allStories.push({ feature: newFeature, story: newFeature.stories[0] });
+              console.log(chalk.green(`  ✓ Added feature: "${newWork.trim()}"`));
+            }
+          }
+          continue; // Go back to selection
+        }
+
+        // Get selected story indices
+        const selectedIndices = selected.filter((s: any) => typeof s === 'number') as number[];
+        selectedStories = selectedIndices.map(idx => allStories[idx]);
+
+        if (selectedStories.length === 0) {
+          console.log(chalk.yellow('No stories selected.'));
+          return;
+        }
+
+        // Action menu
+        const { action } = await inquirerPrompt([{
+          type: 'list',
+          name: 'action',
+          message: `${selectedStories.length} story(ies) selected. What do you want to do?`,
+          choices: [
+            { name: '▶️  Run selected stories', value: 'run' },
+            { name: '👁️  View details', value: 'view' },
+            { name: '✏️  Edit story', value: 'edit' },
+            { name: '🗑️  Remove story', value: 'remove' },
+            { name: '↩️  Back to selection', value: 'back' },
+          ],
+        }]);
+
+        if (action === 'back') {
+          continue;
+        }
+
+        if (action === 'view') {
+          for (const item of selectedStories) {
+            console.log(chalk.blue('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+            console.log(chalk.bold(`📋 ${item.story.title}`));
+            console.log(chalk.blue('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+            console.log(`${chalk.dim('Feature:')} ${item.feature.title}`);
+            console.log(`${chalk.dim('Status:')}  ${item.story.status}`);
+            console.log(`${chalk.dim('ID:')}      ${item.feature.id}/${item.story.id}`);
+            if (item.story.branch) {
+              console.log(`${chalk.dim('Branch:')}  ${item.story.branch}`);
+            }
+            console.log(chalk.dim('\nScope:'));
+            item.story.scope.forEach(s => console.log(`  - ${s}`));
+            if (item.story.blockedBy && item.story.blockedBy.length > 0) {
+              console.log(chalk.dim('\nBlocked by:'));
+              item.story.blockedBy.forEach(b => console.log(`  - ${b}`));
+            }
+          }
+          console.log('');
+          continue;
+        }
+
+        if (action === 'edit') {
+          const item = selectedStories[0]; // Edit first selected
+          console.log(chalk.dim(`\nEditing: ${item.story.title}\n`));
+
+          const { newTitle } = await inquirerPrompt([{
+            type: 'input',
+            name: 'newTitle',
+            message: 'New title (leave empty to keep):',
+            default: item.story.title,
+          }]);
+
+          const { newScope } = await inquirerPrompt([{
+            type: 'input',
+            name: 'newScope',
+            message: 'New scope (comma-separated, leave empty to keep):',
+            default: item.story.scope.join(', '),
+          }]);
+
+          // Update the story
+          item.story.title = newTitle || item.story.title;
+          item.story.scope = newScope ? newScope.split(',').map((s: string) => s.trim()) : item.story.scope;
+
+          await featureManager.updateStory(item.feature.id, item.story.id, {
+            title: item.story.title,
+            scope: item.story.scope,
+          });
+          console.log(chalk.green('  ✓ Story updated'));
+          continue;
+        }
+
+        if (action === 'remove') {
+          const { confirmRemove } = await inquirerPrompt([{
+            type: 'confirm',
+            name: 'confirmRemove',
+            message: `Remove ${selectedStories.length} story(ies)? This cannot be undone.`,
+            default: false,
+          }]);
+
+          if (confirmRemove) {
+            for (const item of selectedStories) {
+              // Remove from feature
+              const feature = await featureManager.get(item.feature.id);
+              if (feature) {
+                feature.stories = feature.stories.filter(s => s.id !== item.story.id);
+                await featureManager.update(feature);
+              }
+              // Remove from local list
+              allStories = allStories.filter(s => !(s.story.id === item.story.id && s.feature.id === item.feature.id));
+            }
+            selectedStories = [];
+            console.log(chalk.green(`  ✓ Removed ${selectedStories.length} story(ies)`));
+          }
+          continue;
+        }
+
+        if (action === 'run') {
+          // Group selected stories by feature
+          const featureMap = new Map<string, typeof featuresWithPending[0]>();
+          for (const item of selectedStories) {
+            if (!featureMap.has(item.feature.id)) {
+              // Clone feature with only selected stories
+              const featureCopy = { ...item.feature, stories: [] as typeof item.feature.stories };
+              featureMap.set(item.feature.id, featureCopy);
+            }
+            featureMap.get(item.feature.id)!.stories.push(item.story);
+          }
+          selectedFeatures = Array.from(featureMap.values());
+
+          // Summary and confirm
+          console.log(chalk.dim('\n─────────────────────────────────'));
+          console.log(chalk.bold('Session Summary:'));
+          console.log(`  Stories:  ${selectedStories.length}`);
+          console.log(`  Mode:     Run until blocked`);
+          console.log(chalk.dim('─────────────────────────────────\n'));
+
+          const { confirm } = await inquirerPrompt([{
+            type: 'confirm',
+            name: 'confirm',
+            message: 'Start working?',
+            default: true,
+          }]);
+
+          if (!confirm) {
+            continue;
+          }
+
+          continueLoop = false; // Exit loop and run
+        }
       }
     }
 
-    // Initialize session runner
-    const runner = new SessionRunner(
-      process.cwd(),
-      config.obsidian?.vault || '~/Documents/Obsidian',
-      config.obsidian?.project || `Projects/${config.name}`
-    );
+    // Run session for each selected feature
+    console.log(chalk.blue('\n🚀 Starting autonomous session...\n'));
 
-    // Run session
-    const result = await runner.run(feature, {
-      maxHours: parseFloat(options.hours),
-      maxStories: options.stories ? parseInt(options.stories, 10) : undefined,
-      stopOnBlocker: options.untilBlocked,
-      pauseBetweenStories: options.pauseBetween,
-      model: options.model as 'sonnet' | 'opus' | 'haiku',
-      dangerouslySkipPermissions: options.yes,
-      iterateUntilGreen: options.retry,
-      maxIterations: options.maxRetries ? parseInt(options.maxRetries, 10) : 5,
-      createPROnComplete: options.pr,
-      createPRPerStory: options.prPerStory,
-    });
+    const runner = new SessionRunner(process.cwd(), vaultPath, projectPath);
 
-    if (!result.success) {
-      console.log(chalk.yellow(`\nSession ended: ${result.error || 'incomplete'}`));
-      process.exit(1);
+    for (const feature of selectedFeatures) {
+      console.log(chalk.bold(`\n📋 Working on: ${feature.title}`));
+
+      const result = await runner.run(feature, {
+        maxHours: options.hours ? parseFloat(options.hours) : undefined,
+        maxStories: options.stories ? parseInt(options.stories, 10) : undefined,
+        stopOnBlocker: options.untilBlocked,
+        model: options.model as 'sonnet' | 'opus' | 'haiku',
+        dangerouslySkipPermissions: !options.interactive, // Only skip if non-interactive
+        createPROnComplete: options.pr,
+        interactive: options.interactive,
+      });
+
+      if (!result.success && result.error?.includes('blocked')) {
+        console.log(chalk.yellow(`\n⚠️  Blocked: ${result.error}`));
+        console.log(chalk.dim('Moving to next feature...\n'));
+        continue;
+      }
+
+      if (!result.success) {
+        console.log(chalk.yellow(`\nSession ended: ${result.error || 'incomplete'}`));
+        break;
+      }
     }
+
+    console.log(chalk.green('\n✅ Session complete!\n'));
   });
 
 // claw resume - Resume from last state
@@ -911,6 +1161,8 @@ program
   .description('Run discovery agents to find work in the codebase')
   .option('-m, --mode <mode>', 'Discovery mode: shallow, balanced, deep', 'balanced')
   .option('-f, --focus <area>', 'Focus on specific area')
+  .option('-i, --interactive', 'Run Claude interactively (see output, can interact)', true)
+  .option('--no-interactive', 'Run in background mode (capture output)')
   .action(async (options) => {
     const { Workspace } = await import('../core/workspace.js');
     const { DiscoveryEngine } = await import('../core/discovery.js');
@@ -928,17 +1180,26 @@ program
 
     console.log(chalk.blue(`\n🔍 Running ${options.mode} discovery...\n`));
 
-    const spinner = ora('Scanning codebase...').start();
+    // In interactive mode, no spinner - Claude output goes directly to terminal
+    const spinner = options.interactive ? null : ora('Scanning codebase...').start();
 
     const results = await engine.runDiscovery({
       mode: options.mode,
       focus: options.focus,
       repos: config.repos,
+      interactive: options.interactive,
     });
 
-    spinner.stop();
+    if (spinner) spinner.stop();
 
-    // Display results
+    // In interactive mode, user already saw all output
+    if (options.interactive) {
+      console.log(chalk.green('\n✓ Discovery complete!'));
+      console.log(chalk.dim('Review the findings above and run `claw feature` to create stories.'));
+      return;
+    }
+
+    // Non-interactive: display parsed results
     let totalFindings = 0;
     for (const result of results) {
       if (result.findings.length === 0) continue;
@@ -964,9 +1225,77 @@ program
 
     if (totalFindings === 0) {
       console.log(chalk.green('✓ No significant issues found!'));
+      console.log(chalk.dim('Tip: Run `claw brainstorm` to get ideas for new features and improvements.'));
     } else {
       console.log(chalk.dim(`\nTotal: ${totalFindings} findings`));
       console.log(chalk.dim('Run `claw feature` to create stories from these findings.'));
+    }
+  });
+
+// claw brainstorm - Get ideas for new features and improvements
+program
+  .command('brainstorm')
+  .description('Brainstorm ideas for new features, improvements, and optimizations')
+  .option('-f, --focus <area>', 'Focus on specific area (e.g., ux, performance, features)')
+  .option('--model <model>', 'Claude model to use (sonnet, opus)', 'sonnet')
+  .action(async (options) => {
+    const { Workspace } = await import('../core/workspace.js');
+    const { ClaudeClient } = await import('../integrations/claude.js');
+
+    const workspace = new Workspace(process.cwd());
+    const config = await workspace.load();
+
+    if (!config) {
+      console.log(chalk.red('✗ Workspace not initialized. Run `claw init` first.'));
+      process.exit(1);
+    }
+
+    const claude = new ClaudeClient(process.cwd());
+
+    // Build the brainstorming prompt
+    let prompt = `You are analyzing a codebase to brainstorm ideas for improvements and new features.
+
+## Project Context
+Name: ${config.name}
+Repos: ${config.repos.map(r => `${r.name} (${r.type})`).join(', ')}
+
+## Your Task
+
+Explore this codebase and brainstorm ideas in these categories:
+
+1. **New Features** - What features could be added to enhance this project?
+2. **UX Improvements** - How could the user experience be improved?
+3. **Performance** - What could be optimized for speed or efficiency?
+4. **Developer Experience** - What would make this codebase easier to work with?
+5. **Architecture** - Are there structural improvements that would help?
+
+For each idea, explain:
+- What it would do
+- Why it would be valuable
+- How complex it would be to implement (small/medium/large)
+
+Be creative but practical. Focus on ideas that would genuinely improve the project.`;
+
+    if (options.focus) {
+      prompt += `\n\n**Focus Area:** ${options.focus}\nPrioritize ideas related to ${options.focus}.`;
+    }
+
+    prompt += '\n\nStart by exploring the codebase to understand what it does, then share your brainstorming ideas.';
+
+    console.log(chalk.blue('\n💡 Starting brainstorm session...\n'));
+    console.log(chalk.dim('Claude will explore your codebase and suggest ideas.\n'));
+
+    try {
+      // Run interactively so user can discuss ideas with Claude
+      await claude.runInteractive(prompt, {
+        model: options.model as 'sonnet' | 'opus',
+      });
+
+      console.log(chalk.green('\n✓ Brainstorm session complete!'));
+      console.log(chalk.dim('Run `claw feature "<idea>"` to create a story from an idea.'));
+    } catch (error) {
+      console.log(chalk.red(`\n✗ Error: ${error instanceof Error ? error.message : String(error)}`));
+      process.exit(1);
     }
   });
 
