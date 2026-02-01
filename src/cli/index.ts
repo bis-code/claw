@@ -116,16 +116,37 @@ program
     // Step 4: Initialize git
     console.log(chalk.dim('\nInitializing git repository...'));
     execSync('git init', { cwd: projectPath, stdio: 'pipe' });
-    // Copy global git config to local repo
+
+    // Ask for git identity (useful for multiple accounts)
+    let defaultEmail = '';
+    let defaultName = '';
     try {
-      const globalEmail = execSync('git config --global user.email', { encoding: 'utf-8' }).trim();
-      const globalName = execSync('git config --global user.name', { encoding: 'utf-8' }).trim();
-      if (globalEmail) execSync(`git config user.email "${globalEmail}"`, { cwd: projectPath, stdio: 'pipe' });
-      if (globalName) execSync(`git config user.name "${globalName}"`, { cwd: projectPath, stdio: 'pipe' });
+      defaultEmail = execSync('git config --global user.email', { encoding: 'utf-8' }).trim();
+      defaultName = execSync('git config --global user.name', { encoding: 'utf-8' }).trim();
     } catch {
-      // Global config not set, that's fine
+      // Global config not set
     }
-    console.log(chalk.green(`  ✓ Git initialized`));
+
+    const { gitEmail, gitName } = await inquirerPrompt([
+      {
+        type: 'input',
+        name: 'gitEmail',
+        message: 'Git email for this project:',
+        default: defaultEmail,
+        validate: (v: string) => v.includes('@') ? true : 'Enter a valid email',
+      },
+      {
+        type: 'input',
+        name: 'gitName',
+        message: 'Git name for this project:',
+        default: defaultName,
+        validate: (v: string) => v.length > 0 ? true : 'Name is required',
+      },
+    ]);
+
+    execSync(`git config user.email "${gitEmail}"`, { cwd: projectPath, stdio: 'pipe' });
+    execSync(`git config user.name "${gitName}"`, { cwd: projectPath, stdio: 'pipe' });
+    console.log(chalk.green(`  ✓ Git initialized (${gitEmail})`));
 
     // Step 5: Create project files based on template
     console.log(chalk.dim(`\nScaffolding ${options.template} project...`));
