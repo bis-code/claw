@@ -132,32 +132,24 @@ function setupGlobalGitignore(): void {
 // Copy skills to target directory
 function copySkills(targetDir: string): number {
   const skillsSource = join(__dirname, '../../templates/skills');
-  const skillsTarget = join(targetDir, '.claude/skills');
+  const skillsTarget = join(targetDir, '.claude/skills/claw');
 
-  // Create target directory
+  // Create target directory (skills must be in a named subdirectory)
   mkdirSync(skillsTarget, { recursive: true });
 
-  // Clean up old skill files and directories
+  // Clean up old skill files from previous versions (v1/v2 format)
   const oldSkillsDir = join(targetDir, '.claude/skills');
-  const oldSkills = ['bug.md', 'feature.md', 'improvement.md', 'brainstorm.md', 'run.md', 'report-bug.md', 'new-feature.md', 'new-improvement.md', 'SKILL.md'];
-  for (const oldSkill of oldSkills) {
+  const oldSkillFiles = [
+    // Old v1/v2 skills at root level
+    'bug.md', 'feature.md', 'improvement.md', 'brainstorm.md', 'run.md',
+    'report-bug.md', 'new-feature.md', 'new-improvement.md', 'SKILL.md',
+    // v3 files that were incorrectly placed at root level
+    'claw-run.md', 'claw-bug.md', 'claw-feature.md', 'claw-improve.md'
+  ];
+  for (const oldSkill of oldSkillFiles) {
     const oldPath = join(oldSkillsDir, oldSkill);
     if (existsSync(oldPath)) {
       unlinkSync(oldPath);
-    }
-  }
-
-  // Clean up old claw subdirectory if exists
-  const oldClawDir = join(oldSkillsDir, 'claw');
-  if (existsSync(oldClawDir)) {
-    const oldClawFiles = readdirSync(oldClawDir);
-    for (const file of oldClawFiles) {
-      unlinkSync(join(oldClawDir, file));
-    }
-    try {
-      rmdirSync(oldClawDir);
-    } catch {
-      // Ignore if not empty or other errors
     }
   }
 
@@ -165,6 +157,19 @@ function copySkills(targetDir: string): number {
   if (!existsSync(skillsSource)) {
     // Create default skills if templates don't exist yet
     const defaultSkills = {
+      'SKILL.md': `# Skill: claw
+
+Work management for Claude Code with 4 commands.
+
+## Trigger
+- \`/claw-run\` - Start a work session
+- \`/claw-bug\` - Report a bug
+- \`/claw-feature\` - Propose a new feature
+- \`/claw-improve\` - Suggest an improvement
+
+## Description
+Simple work management system that tracks bugs, features, and improvements in Obsidian (and optionally GitHub in team mode).
+`,
       'claw-run.md': `---
 name: claw-run
 description: Start a work session
