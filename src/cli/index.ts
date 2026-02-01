@@ -2,7 +2,7 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, statSync, copyFileSync } from 'fs';
+import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, statSync, copyFileSync, unlinkSync } from 'fs';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join, basename } from 'path';
@@ -136,6 +136,15 @@ function copySkills(targetDir: string): number {
 
   // Create target directory
   mkdirSync(skillsTarget, { recursive: true });
+
+  // Clean up old v2 skill files that conflict with v3
+  const oldSkills = ['bug.md', 'feature.md', 'improvement.md', 'brainstorm.md'];
+  for (const oldSkill of oldSkills) {
+    const oldPath = join(skillsTarget, oldSkill);
+    if (existsSync(oldPath)) {
+      unlinkSync(oldPath);
+    }
+  }
 
   // Check if source exists
   if (!existsSync(skillsSource)) {
