@@ -1,4 +1,4 @@
-# /run - Start a Work Session
+# /run
 
 Execute work items autonomously with verification and feedback loops.
 

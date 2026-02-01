@@ -1,4 +1,4 @@
-# /new-improvement - Suggest an Improvement
+# /new-improvement
 
 Create an improvement (refactor, tech-debt, performance, coverage) in Obsidian.
 

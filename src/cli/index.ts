@@ -150,7 +150,7 @@ function copySkills(targetDir: string): number {
   if (!existsSync(skillsSource)) {
     // Create default skills if templates don't exist yet
     const defaultSkills = {
-      'run.md': `# /run - Start a Work Session
+      'run.md': `# /run
 
 Select items from Obsidian (bugs, features, improvements) and execute them autonomously.
 
@@ -187,7 +187,7 @@ Started: <timestamp>
 ...
 \`\`\`
 `,
-      'report-bug.md': `# /report-bug - Report a Bug
+      'report-bug.md': `# /report-bug
 
 Create a bug report in Obsidian (and optionally GitHub in team mode).
 
@@ -225,7 +225,7 @@ Create a bug report in Obsidian (and optionally GitHub in team mode).
 ...
 \`\`\`
 `,
-      'new-feature.md': `# /new-feature - Propose a Feature
+      'new-feature.md': `# /new-feature
 
 Create a feature request in Obsidian (and optionally GitHub in team mode).
 
@@ -260,7 +260,7 @@ Create a feature request in Obsidian (and optionally GitHub in team mode).
 ...
 \`\`\`
 `,
-      'new-improvement.md': `# /new-improvement - Suggest an Improvement
+      'new-improvement.md': `# /new-improvement
 
 Create an improvement (refactor, tech-debt, performance, coverage) in Obsidian.
 
