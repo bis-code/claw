@@ -84,6 +84,16 @@ describe('validateSessionConfig', () => {
     expect(result.valid).toBe(true);
   });
 
+  it('should pass config with undefined maxHours (unlimited run)', () => {
+    const config: Partial<SessionConfig> = {
+      model: 'sonnet',
+    };
+
+    const result = validateSessionConfig(config);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
   it('should fail on invalid hours', () => {
     const config: Partial<SessionConfig> = {
       maxHours: -1,

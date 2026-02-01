@@ -102,10 +102,10 @@ export function validateSessionConfig(config: Partial<SessionConfig>): Validatio
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
 
-  // Required fields
-  if (config.maxHours === undefined || config.maxHours <= 0) {
+  // maxHours is optional (undefined = no limit), but if provided must be positive
+  if (config.maxHours !== undefined && config.maxHours <= 0) {
     errors.push({ field: 'maxHours', message: 'maxHours must be a positive number', code: 'INVALID_HOURS' });
-  } else if (config.maxHours > 24) {
+  } else if (config.maxHours !== undefined && config.maxHours > 24) {
     warnings.push({
       field: 'maxHours',
       message: 'Session longer than 24 hours',

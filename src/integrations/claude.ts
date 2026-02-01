@@ -41,6 +41,10 @@ export interface SpawnOptions {
   maxTurns?: number;
   timeoutMs?: number;
   allowedTools?: string[];
+  /** Run in interactive mode (inherit terminal, user can interact) */
+  interactive?: boolean;
+  /** Initial prompt - if not provided, opens empty session */
+  prompt?: string;
 }
 
 export class ClaudeClient {
@@ -52,7 +56,7 @@ export class ClaudeClient {
   }
 
   /**
-   * Spawn a claude CLI session
+   * Spawn a claude CLI session (non-interactive, captures output)
    */
   async spawn(prompt: string, options: SpawnOptions = {}): Promise<ClaudeSession> {
     const sessionId = randomUUID().slice(0, 8);
@@ -117,6 +121,93 @@ export class ClaudeClient {
     this.sessions.set(sessionId, session);
 
     return session;
+  }
+
+  /**
+   * Run Claude interactively - user sees output and can interact
+   * Returns exit code when session ends
+   */
+  async runInteractive(prompt: string, options: SpawnOptions = {}): Promise<number> {
+    // Build command arguments
+    const args: string[] = [];
+
+    if (options.model) {
+      args.push('--model', options.model);
+    }
+
+    if (options.dangerouslySkipPermissions) {
+      args.push('--dangerously-skip-permissions');
+    }
+
+    if (options.maxTurns) {
+      args.push('--max-turns', options.maxTurns.toString());
+    }
+
+    if (options.allowedTools && options.allowedTools.length > 0) {
+      args.push('--allowed-tools', options.allowedTools.join(','));
+    }
+
+    // For interactive mode, we write the prompt to a temp file that Claude can reference
+    // and start Claude without -p so user can have a full conversation
+    if (prompt) {
+      const contextFile = join(this.workingDir, '.claw-context.md');
+      await writeFile(contextFile, prompt);
+      console.log(`Context written to ${contextFile}`);
+      console.log('Starting Claude - you can reference the context or just chat naturally.\n');
+    }
+
+    // Spawn claude with inherited stdio - full terminal access, no -p flag
+    const claudeProcess = spawn('claude', args, {
+      cwd: this.workingDir,
+      stdio: 'inherit',
+      env: { ...process.env },
+    });
+
+    return new Promise((resolve, reject) => {
+      claudeProcess.on('exit', async (code) => {
+        // Clean up context file
+        const contextFile = join(this.workingDir, '.claw-context.md');
+        if (existsSync(contextFile)) {
+          await unlink(contextFile);
+        }
+        resolve(code ?? 0);
+      });
+
+      claudeProcess.on('error', (err) => {
+        reject(err);
+      });
+    });
+  }
+
+  /**
+   * Resume an existing Claude session interactively
+   */
+  async resumeInteractive(sessionId: string, options: SpawnOptions = {}): Promise<number> {
+    const args: string[] = ['--resume', sessionId];
+
+    if (options.model) {
+      args.push('--model', options.model);
+    }
+
+    if (options.dangerouslySkipPermissions) {
+      args.push('--dangerously-skip-permissions');
+    }
+
+    const claudeProcess = spawn('claude', args, {
+      cwd: this.workingDir,
+      stdio: 'inherit',
+      env: { ...process.env },
+    });
+
+    return new Promise((resolve, reject) => {
+      claudeProcess.on('exit', (code) => {
+        resolve(code ?? 0);
+      });
+
+      claudeProcess.on('error', (err) => {
+        reject(err);
+      });
+    });
   }
 
   /**

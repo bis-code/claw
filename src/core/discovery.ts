@@ -27,6 +27,8 @@ export interface DiscoveryOptions {
   focus?: string;
   repos: Repo[];
   maxFindings?: number;
+  /** Run interactively (user sees Claude output and can interact) */
+  interactive?: boolean;
 }
 
 // Agent prompts for different discovery types
@@ -92,19 +94,66 @@ export class DiscoveryEngine {
   }
 
   /**
-   * Run all discovery agents in parallel
+   * Run all discovery agents
    */
   async runDiscovery(options: DiscoveryOptions): Promise<DiscoveryResult[]> {
-    const { mode, focus } = options;
+    const { mode } = options;
 
     // Determine which agents to run based on mode
     const agents = this.getAgentsForMode(mode);
 
-    // Run agents in parallel
+    // Interactive mode: run agents sequentially so user can see each one
+    if (options.interactive) {
+      const results: DiscoveryResult[] = [];
+      for (const agent of agents) {
+        const result = await this.runAgentInteractive(agent, options);
+        results.push(result);
+      }
+      return results;
+    }
+
+    // Non-interactive: run agents in parallel
     const promises = agents.map(agent => this.runAgent(agent, options));
     const results = await Promise.all(promises);
 
     return results;
+  }
+
+  /**
+   * Run a discovery agent interactively
+   */
+  private async runAgentInteractive(
+    agent: keyof typeof AGENT_PROMPTS,
+    options: DiscoveryOptions
+  ): Promise<DiscoveryResult> {
+    const startTime = Date.now();
+    const prompt = this.buildAgentPrompt(agent, options);
+
+    console.log(`\n--- Running ${agent.toUpperCase()} agent ---\n`);
+
+    try {
+      const exitCode = await this.claude.runInteractive(prompt, {
+        model: this.getModelForAgent(agent, options.mode),
+        maxTurns: this.getMaxTurnsForMode(options.mode),
+        dangerouslySkipPermissions: true,
+      });
+
+      console.log(`\n--- ${agent.toUpperCase()} agent completed ---\n`);
+
+      // In interactive mode, we can't parse findings from output
+      // The user sees everything directly in the terminal
+      return {
+        agent,
+        findings: [],
+        duration: Date.now() - startTime,
+      };
+    } catch (error) {
+      return {
+        agent,
+        findings: [],
+        duration: Date.now() - startTime,
+      };
+    }
   }
 
   /**
