@@ -1,4 +1,4 @@
-# /report-bug
+# /claw-bug
 
 Create a bug report in Obsidian (and GitHub in team mode).
 

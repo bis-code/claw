@@ -151,7 +151,20 @@ function copySkills(targetDir: string): number {
   if (!existsSync(skillsSource)) {
     // Create default skills if templates don't exist yet
     const defaultSkills = {
-      'run.md': `# /run
+      'SKILL.md': `# Claw - Work Management
+
+Simple work management with 4 commands.
+
+## Commands
+
+| Command | Purpose |
+|---------|---------|
+| \`/claw-run\` | Start a work session |
+| \`/claw-bug\` | Report a bug |
+| \`/claw-feature\` | Propose a new feature |
+| \`/claw-improve\` | Suggest an improvement |
+`,
+      'claw-run.md': `# /claw-run
 
 Select items from Obsidian (bugs, features, improvements) and execute them autonomously.
 
@@ -169,26 +182,8 @@ Select items from Obsidian (bugs, features, improvements) and execute them auton
 **CRITICAL: After context compaction, read \`.claw-session.md\` to recover state.**
 
 Check progress markers and continue from where you left off.
-
-## Session File Format
-
-\`\`\`markdown
-# Session: <name>
-Started: <timestamp>
-
-## Items
-
-### 1. <title>
-- [x] Understood
-- [ ] Tests written
-- [ ] Implementation
-- [ ] Verified
-
-### 2. <title>
-...
-\`\`\`
 `,
-      'report-bug.md': `# /report-bug
+      'claw-bug.md': `# /claw-bug
 
 Create a bug report in Obsidian (and optionally GitHub in team mode).
 
@@ -199,34 +194,8 @@ Create a bug report in Obsidian (and optionally GitHub in team mode).
 3. Ask if screenshot needed
 4. Create bug note in Obsidian: \`bugs/<slug>.md\`
 5. If team mode: also create GitHub issue
-
-## Bug Note Format
-
-\`\`\`markdown
-# Bug: <title>
-
-**Priority:** P2
-**Status:** pending
-**Created:** <date>
-
-## Description
-
-<description>
-
-## Screenshots
-
-<if any>
-
-## Steps to Reproduce
-
-1. ...
-
-## Expected vs Actual
-
-...
-\`\`\`
 `,
-      'new-feature.md': `# /new-feature
+      'claw-feature.md': `# /claw-feature
 
 Create a feature request in Obsidian (and optionally GitHub in team mode).
 
@@ -237,31 +206,8 @@ Create a feature request in Obsidian (and optionally GitHub in team mode).
 3. Ask if E2E tests needed
 4. Create feature note in Obsidian: \`features/<slug>.md\`
 5. If team mode: also create GitHub issue
-
-## Feature Note Format
-
-\`\`\`markdown
-# Feature: <title>
-
-**Status:** pending
-**Created:** <date>
-**E2E Required:** <yes/no>
-
-## Description
-
-<description>
-
-## Acceptance Criteria
-
-- [ ] Criterion 1
-- [ ] Criterion 2
-
-## Notes
-
-...
-\`\`\`
 `,
-      'new-improvement.md': `# /new-improvement
+      'claw-improve.md': `# /claw-improve
 
 Create an improvement (refactor, tech-debt, performance, coverage) in Obsidian.
 
@@ -349,10 +295,10 @@ If no session file exists, no active work.
 
 ## Available Commands
 
-- \`/run\` - Start a work session
-- \`/report-bug\` - Report a bug
-- \`/new-feature\` - Propose a feature
-- \`/new-improvement\` - Suggest an improvement
+- \`/claw-run\` - Start a work session
+- \`/claw-bug\` - Report a bug
+- \`/claw-feature\` - Propose a feature
+- \`/claw-improve\` - Suggest an improvement
 
 ## Configuration
 
@@ -819,10 +765,10 @@ Read \`.claw-session.md\` if it exists for current work context.
     // Done!
     console.log(chalk.green('\nDone!'));
     console.log(chalk.dim('\nIn Claude Code, try:'));
-    console.log(chalk.cyan('  /run            ') + chalk.dim('- start a work session'));
-    console.log(chalk.cyan('  /report-bug     ') + chalk.dim('- report a bug'));
-    console.log(chalk.cyan('  /new-feature    ') + chalk.dim('- propose a feature'));
-    console.log(chalk.cyan('  /new-improvement') + chalk.dim('- suggest an improvement'));
+    console.log(chalk.cyan('  /claw-run    ') + chalk.dim('- start a work session'));
+    console.log(chalk.cyan('  /claw-bug    ') + chalk.dim('- report a bug'));
+    console.log(chalk.cyan('  /claw-feature') + chalk.dim('- propose a feature'));
+    console.log(chalk.cyan('  /claw-improve') + chalk.dim('- suggest an improvement'));
   });
 
 // Parse and run

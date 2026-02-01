@@ -1,4 +1,4 @@
-# /new-improvement
+# /claw-improve
 
 Create an improvement (refactor, tech-debt, performance, coverage) in Obsidian.
 

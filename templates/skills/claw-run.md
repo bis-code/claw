@@ -1,4 +1,4 @@
-# /run
+# /claw-run
 
 Execute work items autonomously with verification and feedback loops.
 
