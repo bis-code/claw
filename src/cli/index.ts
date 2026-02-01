@@ -2,7 +2,7 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, statSync, copyFileSync, unlinkSync } from 'fs';
+import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync, statSync, copyFileSync, unlinkSync, rmdirSync } from 'fs';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join, basename } from 'path';
@@ -132,12 +132,12 @@ function setupGlobalGitignore(): void {
 // Copy skills to target directory
 function copySkills(targetDir: string): number {
   const skillsSource = join(__dirname, '../../templates/skills');
-  const skillsTarget = join(targetDir, '.claude/skills/claw');
+  const skillsTarget = join(targetDir, '.claude/skills');
 
-  // Create target directory (skills must be in a subdirectory)
+  // Create target directory
   mkdirSync(skillsTarget, { recursive: true });
 
-  // Clean up old v2 skill files that might be in wrong locations
+  // Clean up old skill files and directories
   const oldSkillsDir = join(targetDir, '.claude/skills');
   const oldSkills = ['bug.md', 'feature.md', 'improvement.md', 'brainstorm.md', 'run.md', 'report-bug.md', 'new-feature.md', 'new-improvement.md', 'SKILL.md'];
   for (const oldSkill of oldSkills) {
@@ -147,24 +147,30 @@ function copySkills(targetDir: string): number {
     }
   }
 
+  // Clean up old claw subdirectory if exists
+  const oldClawDir = join(oldSkillsDir, 'claw');
+  if (existsSync(oldClawDir)) {
+    const oldClawFiles = readdirSync(oldClawDir);
+    for (const file of oldClawFiles) {
+      unlinkSync(join(oldClawDir, file));
+    }
+    try {
+      rmdirSync(oldClawDir);
+    } catch {
+      // Ignore if not empty or other errors
+    }
+  }
+
   // Check if source exists
   if (!existsSync(skillsSource)) {
     // Create default skills if templates don't exist yet
     const defaultSkills = {
-      'SKILL.md': `# Claw - Work Management
+      'claw-run.md': `---
+name: claw-run
+description: Start a work session
+---
 
-Simple work management with 4 commands.
-
-## Commands
-
-| Command | Purpose |
-|---------|---------|
-| \`/claw-run\` | Start a work session |
-| \`/claw-bug\` | Report a bug |
-| \`/claw-feature\` | Propose a new feature |
-| \`/claw-improve\` | Suggest an improvement |
-`,
-      'claw-run.md': `# /claw-run
+# /claw-run
 
 Select items from Obsidian (bugs, features, improvements) and execute them autonomously.
 
@@ -183,7 +189,12 @@ Select items from Obsidian (bugs, features, improvements) and execute them auton
 
 Check progress markers and continue from where you left off.
 `,
-      'claw-bug.md': `# /claw-bug
+      'claw-bug.md': `---
+name: claw-bug
+description: Report a bug
+---
+
+# /claw-bug
 
 Create a bug report in Obsidian (and optionally GitHub in team mode).
 
@@ -195,7 +206,12 @@ Create a bug report in Obsidian (and optionally GitHub in team mode).
 4. Create bug note in Obsidian: \`bugs/<slug>.md\`
 5. If team mode: also create GitHub issue
 `,
-      'claw-feature.md': `# /claw-feature
+      'claw-feature.md': `---
+name: claw-feature
+description: Propose a new feature
+---
+
+# /claw-feature
 
 Create a feature request in Obsidian (and optionally GitHub in team mode).
 
@@ -207,7 +223,12 @@ Create a feature request in Obsidian (and optionally GitHub in team mode).
 4. Create feature note in Obsidian: \`features/<slug>.md\`
 5. If team mode: also create GitHub issue
 `,
-      'claw-improve.md': `# /claw-improve
+      'claw-improve.md': `---
+name: claw-improve
+description: Suggest an improvement
+---
+
+# /claw-improve
 
 Create an improvement (refactor, tech-debt, performance, coverage) in Obsidian.
 
