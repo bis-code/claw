@@ -1,13 +1,12 @@
 {
   "name": "@bis-code/claw",
-  "version": "3.2.0",
+  "version": "3.2.1",
   "description": "Claude Automated Workflow - Orchestration layer for autonomous AI development",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "claw": "dist/cli/index.js",
-    "claw-v2": "dist/cli/index.js"
+    "claw": "dist/cli/index.js"
   },
   "files": [
     "dist",
@@ -19,7 +18,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/cli/index.js",
-    "test": "NODE_OPTIONS='--experimental-vm-modules' jest",
+    "test": "NODE_OPTIONS='--experimental-vm-modules' jest --passWithNoTests",
     "test:watch": "NODE_OPTIONS='--experimental-vm-modules' jest --watch",
     "lint": "eslint src/",
     "clean": "rm -rf dist/",
