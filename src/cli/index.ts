@@ -24,7 +24,6 @@ program
 program
   .command('new <name>')
   .description('Create a new project with full setup (repo, Obsidian, GitHub)')
-  .option('-t, --template <type>', 'Project template: typescript, go, python, monorepo', 'typescript')
   .option('--no-github', 'Skip GitHub repo creation')
   .option('--private', 'Create private GitHub repo')
   .option('-p, --path <dir>', 'Parent directory for project', '.')
@@ -58,46 +57,97 @@ program
       }
     }
 
-    // Step 2: Check GitHub auth
+    // Step 2: Get available GitHub accounts
+    interface GitHubAccount {
+      username: string;
+      email: string;
+      name: string;
+    }
+
+    const accounts: GitHubAccount[] = [];
+    let selectedAccount: GitHubAccount | null = null;
+
     if (options.github !== false) {
-      console.log(chalk.dim('\nChecking GitHub authentication...'));
+      console.log(chalk.dim('\nChecking GitHub accounts...'));
+
       try {
+        // Get all authenticated accounts
         const authStatus = execSync('gh auth status 2>&1', { encoding: 'utf-8' });
-        const accountMatch = authStatus.match(/Logged in to github\.com account (\S+)/);
-        if (accountMatch) {
-          console.log(chalk.green(`  ✓ Authenticated as ${accountMatch[1]}`));
-        } else {
-          console.log(chalk.green(`  ✓ Authenticated`));
+
+        // Parse accounts from auth status (matches "Logged in to github.com account USERNAME")
+        const accountMatches = authStatus.matchAll(/Logged in to github\.com account (\S+)/g);
+
+        for (const match of accountMatches) {
+          const username = match[1];
+          try {
+            // Get user details from GitHub API
+            const userJson = execSync(`gh api users/${username}`, { encoding: 'utf-8' });
+            const user = JSON.parse(userJson);
+
+            // Try to get email from GitHub API (might be null if private)
+            let email = user.email || '';
+            if (!email) {
+              // Try to get from user's commits API
+              try {
+                const commitsJson = execSync(`gh api users/${username}/events/public --jq '.[].payload.commits[]?.author.email' 2>/dev/null | head -1`, { encoding: 'utf-8' });
+                email = commitsJson.trim() || `${username}@users.noreply.github.com`;
+              } catch {
+                email = `${username}@users.noreply.github.com`;
+              }
+            }
+
+            accounts.push({
+              username,
+              email,
+              name: user.name || username,
+            });
+            console.log(chalk.green(`  ✓ Found account: ${username} (${user.name || 'No name'})`));
+          } catch {
+            // Fallback if API fails
+            accounts.push({
+              username,
+              email: `${username}@users.noreply.github.com`,
+              name: username,
+            });
+            console.log(chalk.green(`  ✓ Found account: ${username}`));
+          }
         }
 
-        // Ask which account to use if multiple
-        const { useAccount } = await inquirerPrompt([{
-          type: 'confirm',
-          name: 'useAccount',
-          message: `Create repo with this account?`,
-          default: true,
-        }]);
+        if (accounts.length === 0) {
+          console.log(chalk.yellow('  ⚠ No GitHub accounts found'));
+          const { login } = await inquirerPrompt([{
+            type: 'confirm',
+            name: 'login',
+            message: 'Login to GitHub now?',
+            default: true,
+          }]);
 
-        if (!useAccount) {
-          console.log(chalk.yellow('\nRun `gh auth login` to switch accounts, then try again.'));
-          process.exit(0);
+          if (login) {
+            spawnSync('gh', ['auth', 'login'], { stdio: 'inherit' });
+            console.log(chalk.dim('Please re-run `claw new` after login.'));
+            process.exit(0);
+          } else {
+            options.github = false;
+          }
+        } else if (accounts.length === 1) {
+          selectedAccount = accounts[0];
+          console.log(chalk.dim(`\nUsing account: ${selectedAccount.username}`));
+        } else {
+          // Multiple accounts - let user choose
+          const { accountChoice } = await inquirerPrompt([{
+            type: 'list',
+            name: 'accountChoice',
+            message: 'Which GitHub account should own this project?',
+            choices: accounts.map(a => ({
+              name: `${a.username} (${a.name}) - ${a.email}`,
+              value: a.username,
+            })),
+          }]);
+          selectedAccount = accounts.find(a => a.username === accountChoice) || accounts[0];
         }
       } catch {
-        console.log(chalk.yellow('  ⚠ Not authenticated with GitHub'));
-        const { login } = await inquirerPrompt([{
-          type: 'confirm',
-          name: 'login',
-          message: 'Login to GitHub now?',
-          default: true,
-        }]);
-
-        if (login) {
-          console.log(chalk.dim('\nOpening GitHub login...\n'));
-          spawnSync('gh', ['auth', 'login'], { stdio: 'inherit' });
-        } else {
-          console.log(chalk.dim('Skipping GitHub repo creation.'));
-          options.github = false;
-        }
+        console.log(chalk.yellow('  ⚠ Could not check GitHub accounts'));
+        options.github = false;
       }
     }
 
@@ -113,131 +163,188 @@ program
     await mkdir(projectPath, { recursive: true });
     console.log(chalk.green(`  ✓ Created directory`));
 
-    // Step 4: Initialize git
+    // Step 4: Initialize git with selected account's identity
     console.log(chalk.dim('\nInitializing git repository...'));
     execSync('git init', { cwd: projectPath, stdio: 'pipe' });
 
-    // Ask for git identity (useful for multiple accounts)
-    let defaultEmail = '';
-    let defaultName = '';
-    try {
-      defaultEmail = execSync('git config --global user.email', { encoding: 'utf-8' }).trim();
-      defaultName = execSync('git config --global user.name', { encoding: 'utf-8' }).trim();
-    } catch {
-      // Global config not set
-    }
+    // Use selected GitHub account or prompt for identity
+    let gitEmail: string;
+    let gitName: string;
 
-    const { gitEmail, gitName } = await inquirerPrompt([
-      {
-        type: 'input',
-        name: 'gitEmail',
-        message: 'Git email for this project:',
-        default: defaultEmail,
-        validate: (v: string) => v.includes('@') ? true : 'Enter a valid email',
-      },
-      {
-        type: 'input',
-        name: 'gitName',
-        message: 'Git name for this project:',
-        default: defaultName,
-        validate: (v: string) => v.length > 0 ? true : 'Name is required',
-      },
-    ]);
+    if (selectedAccount) {
+      // Confirm or override the account's identity
+      const { useAccountIdentity } = await inquirerPrompt([{
+        type: 'confirm',
+        name: 'useAccountIdentity',
+        message: `Use git identity: ${selectedAccount.name} <${selectedAccount.email}>?`,
+        default: true,
+      }]);
+
+      if (useAccountIdentity) {
+        gitEmail = selectedAccount.email;
+        gitName = selectedAccount.name;
+      } else {
+        const answers = await inquirerPrompt([
+          {
+            type: 'input',
+            name: 'gitEmail',
+            message: 'Git email:',
+            default: selectedAccount.email,
+          },
+          {
+            type: 'input',
+            name: 'gitName',
+            message: 'Git name:',
+            default: selectedAccount.name,
+          },
+        ]);
+        gitEmail = answers.gitEmail;
+        gitName = answers.gitName;
+      }
+    } else {
+      // No GitHub account, ask for identity manually
+      let defaultEmail = '';
+      let defaultName = '';
+      try {
+        defaultEmail = execSync('git config --global user.email', { encoding: 'utf-8' }).trim();
+        defaultName = execSync('git config --global user.name', { encoding: 'utf-8' }).trim();
+      } catch {
+        // Global config not set
+      }
+
+      const answers = await inquirerPrompt([
+        {
+          type: 'input',
+          name: 'gitEmail',
+          message: 'Git email for this project:',
+          default: defaultEmail,
+          validate: (v: string) => v.includes('@') ? true : 'Enter a valid email',
+        },
+        {
+          type: 'input',
+          name: 'gitName',
+          message: 'Git name for this project:',
+          default: defaultName,
+          validate: (v: string) => v.length > 0 ? true : 'Name is required',
+        },
+      ]);
+      gitEmail = answers.gitEmail;
+      gitName = answers.gitName;
+    }
 
     execSync(`git config user.email "${gitEmail}"`, { cwd: projectPath, stdio: 'pipe' });
     execSync(`git config user.name "${gitName}"`, { cwd: projectPath, stdio: 'pipe' });
     console.log(chalk.green(`  ✓ Git initialized (${gitEmail})`));
 
-    // Step 5: Create project files based on template
-    console.log(chalk.dim(`\nScaffolding ${options.template} project...`));
+    // Step 5: Ask user to describe the project structure
+    console.log(chalk.blue('\n📁 Project Structure\n'));
 
-    const templates: Record<string, () => Promise<void>> = {
-      typescript: async () => {
-        await writeFile(join(projectPath, 'package.json'), JSON.stringify({
-          name,
-          version: '0.1.0',
-          type: 'module',
-          scripts: {
-            build: 'tsc',
-            dev: 'tsc --watch',
-            test: 'jest',
-          },
-        }, null, 2));
-        await writeFile(join(projectPath, 'tsconfig.json'), JSON.stringify({
-          compilerOptions: {
-            target: 'ES2022',
-            module: 'ESNext',
-            moduleResolution: 'node',
-            esModuleInterop: true,
-            strict: true,
-            outDir: 'dist',
-          },
-          include: ['src'],
-        }, null, 2));
-        await mkdir(join(projectPath, 'src'));
-        await writeFile(join(projectPath, 'src', 'index.ts'), '// Entry point\n\nconsole.log("Hello, world!");\n');
-        await writeFile(join(projectPath, '.gitignore'), 'node_modules/\ndist/\n.env\n');
-      },
-      go: async () => {
-        await writeFile(join(projectPath, 'go.mod'), `module ${name}\n\ngo 1.21\n`);
-        await writeFile(join(projectPath, 'main.go'), `package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("Hello, world!")\n}\n`);
-        await writeFile(join(projectPath, '.gitignore'), `${name}\n*.exe\n.env\n`);
-      },
-      python: async () => {
-        await writeFile(join(projectPath, 'requirements.txt'), '# Add dependencies here\n');
-        await writeFile(join(projectPath, 'main.py'), '#!/usr/bin/env python3\n\ndef main():\n    print("Hello, world!")\n\nif __name__ == "__main__":\n    main()\n');
-        await writeFile(join(projectPath, '.gitignore'), '__pycache__/\n*.pyc\nvenv/\n.env\n');
-        await mkdir(join(projectPath, 'src'));
-        await writeFile(join(projectPath, 'src', '__init__.py'), '');
-      },
-      monorepo: async () => {
-        await writeFile(join(projectPath, 'package.json'), JSON.stringify({
-          name,
-          private: true,
-          workspaces: ['apps/*', 'packages/*'],
-          scripts: {
-            build: 'turbo build',
-            dev: 'turbo dev',
-            test: 'turbo test',
-          },
-        }, null, 2));
-        await mkdir(join(projectPath, 'apps'));
-        await mkdir(join(projectPath, 'packages'));
-        await writeFile(join(projectPath, 'turbo.json'), JSON.stringify({
-          "$schema": "https://turbo.build/schema.json",
-          tasks: { build: {}, dev: { cache: false }, test: {} },
-        }, null, 2));
-        await writeFile(join(projectPath, '.gitignore'), 'node_modules/\ndist/\n.turbo/\n.env\n');
-      },
-    };
+    const { structureChoice } = await inquirerPrompt([{
+      type: 'list',
+      name: 'structureChoice',
+      message: 'How would you like to set up the project?',
+      choices: [
+        { name: 'Describe it (Claude will scaffold based on your description)', value: 'describe' },
+        { name: 'TypeScript (quick start)', value: 'typescript' },
+        { name: 'Python (quick start)', value: 'python' },
+        { name: 'Go (quick start)', value: 'go' },
+        { name: 'Minimal (just .gitignore and README)', value: 'minimal' },
+      ],
+    }]);
 
-    const scaffoldFn = templates[options.template];
-    if (scaffoldFn) {
-      await scaffoldFn();
-      console.log(chalk.green(`  ✓ ${options.template} template created`));
+    if (structureChoice === 'describe') {
+      // User describes what they want
+      const { projectDescription } = await inquirerPrompt([{
+        type: 'input',
+        name: 'projectDescription',
+        message: 'Describe your project (e.g., "Next.js app with Tailwind, Prisma, and tRPC"):\n',
+      }]);
+
+      console.log(chalk.dim('\n📝 Project description saved.'));
+      console.log(chalk.dim('Run `claude` in the project directory and ask it to scaffold based on this description:\n'));
+      console.log(chalk.cyan(`  "${projectDescription}"`));
+      console.log('');
+
+      // Create minimal structure with description
+      await writeFile(join(projectPath, '.gitignore'), 'node_modules/\ndist/\nbuild/\n.env\n.env.local\n*.log\n');
+      await writeFile(join(projectPath, 'README.md'), `# ${name}\n\n## Project Description\n\n${projectDescription}\n\n## Getting Started\n\nRun \`claude\` and ask it to scaffold this project based on the description above.\n`);
+      await writeFile(join(projectPath, 'PROJECT_SPEC.md'), `# Project Specification\n\n${projectDescription}\n\n## Instructions for Claude\n\nPlease scaffold this project with:\n- Appropriate directory structure\n- Package configuration\n- Basic setup files\n- Development tooling\n`);
+
+      console.log(chalk.green('  ✓ Created PROJECT_SPEC.md with your description'));
+    } else if (structureChoice === 'minimal') {
+      await writeFile(join(projectPath, '.gitignore'), 'node_modules/\ndist/\nbuild/\n.env\n.env.local\n*.log\n');
+      await writeFile(join(projectPath, 'README.md'), `# ${name}\n\nCreated with [claw](https://github.com/bis-code/claw).\n`);
+      console.log(chalk.green('  ✓ Minimal structure created'));
     } else {
-      console.log(chalk.yellow(`  ⚠ Unknown template: ${options.template}, creating minimal structure`));
-      await writeFile(join(projectPath, '.gitignore'), '.env\n');
+      // Quick start templates
+      const templates: Record<string, () => Promise<void>> = {
+        typescript: async () => {
+          await writeFile(join(projectPath, 'package.json'), JSON.stringify({
+            name,
+            version: '0.1.0',
+            type: 'module',
+            scripts: {
+              build: 'tsc',
+              dev: 'tsc --watch',
+              test: 'jest',
+            },
+          }, null, 2));
+          await writeFile(join(projectPath, 'tsconfig.json'), JSON.stringify({
+            compilerOptions: {
+              target: 'ES2022',
+              module: 'ESNext',
+              moduleResolution: 'node',
+              esModuleInterop: true,
+              strict: true,
+              outDir: 'dist',
+            },
+            include: ['src'],
+          }, null, 2));
+          await mkdir(join(projectPath, 'src'));
+          await writeFile(join(projectPath, 'src', 'index.ts'), '// Entry point\n\nconsole.log("Hello, world!");\n');
+          await writeFile(join(projectPath, '.gitignore'), 'node_modules/\ndist/\n.env\n');
+        },
+        go: async () => {
+          await writeFile(join(projectPath, 'go.mod'), `module ${name}\n\ngo 1.21\n`);
+          await writeFile(join(projectPath, 'main.go'), `package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("Hello, world!")\n}\n`);
+          await writeFile(join(projectPath, '.gitignore'), `${name}\n*.exe\n.env\n`);
+        },
+        python: async () => {
+          await writeFile(join(projectPath, 'requirements.txt'), '# Add dependencies here\n');
+          await writeFile(join(projectPath, 'main.py'), '#!/usr/bin/env python3\n\ndef main():\n    print("Hello, world!")\n\nif __name__ == "__main__":\n    main()\n');
+          await writeFile(join(projectPath, '.gitignore'), '__pycache__/\n*.pyc\nvenv/\n.env\n');
+          await mkdir(join(projectPath, 'src'));
+          await writeFile(join(projectPath, 'src', '__init__.py'), '');
+        },
+      };
+
+      await templates[structureChoice]();
+      console.log(chalk.green(`  ✓ ${structureChoice} template created`));
     }
 
-    // Step 6: Create README
-    await writeFile(join(projectPath, 'README.md'), `# ${name}\n\nCreated with [claw](https://github.com/bis-code/claw).\n\n## Getting Started\n\nTODO: Add setup instructions.\n`);
+    // Step 6: Create README if not already created
+    const readmePath = join(projectPath, 'README.md');
+    if (!existsSync(readmePath)) {
+      await writeFile(readmePath, `# ${name}\n\nCreated with [claw](https://github.com/bis-code/claw).\n\n## Getting Started\n\nTODO: Add setup instructions.\n`);
+    }
 
     // Step 7: Create initial commit
     execSync('git add -A', { cwd: projectPath, stdio: 'pipe' });
     execSync('git commit -m "Initial commit\n\n🤖 Generated with claw"', { cwd: projectPath, stdio: 'pipe' });
     console.log(chalk.green(`  ✓ Initial commit created`));
 
-    // Step 8: Create GitHub repo
-    if (options.github !== false) {
-      console.log(chalk.dim('\nCreating GitHub repository...'));
+    // Step 8: Create GitHub repo under selected account
+    if (options.github !== false && selectedAccount) {
+      console.log(chalk.dim(`\nCreating GitHub repository under ${selectedAccount.username}...`));
       try {
         const visibility = options.private ? '--private' : '--public';
-        execSync(`gh repo create ${name} ${visibility} --source . --remote origin --push`, {
+        // Use full repo path with username to ensure correct account
+        const repoName = `${selectedAccount.username}/${name}`;
+        execSync(`gh repo create ${repoName} ${visibility} --source . --remote origin --push`, {
           cwd: projectPath,
           stdio: 'pipe',
         });
-        console.log(chalk.green(`  ✓ GitHub repo created and pushed`));
+        console.log(chalk.green(`  ✓ GitHub repo created: ${repoName}`));
       } catch (error) {
         console.log(chalk.yellow(`  ⚠ Failed to create GitHub repo: ${error instanceof Error ? error.message : error}`));
         console.log(chalk.dim('    You can create it manually: gh repo create'));
