@@ -20,6 +20,237 @@ program
 
 // Main commands will be added here as we implement them
 
+// claw new - Create a new project from scratch
+program
+  .command('new <name>')
+  .description('Create a new project with full setup (repo, Obsidian, GitHub)')
+  .option('-t, --template <type>', 'Project template: typescript, go, python, monorepo', 'typescript')
+  .option('--no-github', 'Skip GitHub repo creation')
+  .option('--private', 'Create private GitHub repo')
+  .option('-p, --path <dir>', 'Parent directory for project', '.')
+  .action(async (name, options) => {
+    const { execSync, spawnSync } = await import('child_process');
+    const { mkdir, writeFile } = await import('fs/promises');
+    const { join } = await import('path');
+    const { existsSync } = await import('fs');
+    const { homedir } = await import('os');
+    const inquirerModule = await import('inquirer');
+    const inquirerPrompt = inquirerModule.default.prompt;
+
+    console.log(chalk.blue(`\n🚀 Creating new project: ${name}\n`));
+
+    // Step 1: Check prerequisites
+    console.log(chalk.dim('Checking prerequisites...'));
+
+    const checks = [
+      { cmd: 'git --version', name: 'git' },
+      { cmd: 'gh --version', name: 'GitHub CLI (gh)' },
+    ];
+
+    for (const check of checks) {
+      try {
+        execSync(check.cmd, { stdio: 'pipe' });
+        console.log(chalk.green(`  ✓ ${check.name}`));
+      } catch {
+        console.log(chalk.red(`  ✗ ${check.name} not found`));
+        console.log(chalk.dim(`    Install: ${check.name === 'git' ? 'https://git-scm.com' : 'brew install gh'}`));
+        process.exit(1);
+      }
+    }
+
+    // Step 2: Check GitHub auth
+    if (options.github !== false) {
+      console.log(chalk.dim('\nChecking GitHub authentication...'));
+      try {
+        const authStatus = execSync('gh auth status 2>&1', { encoding: 'utf-8' });
+        const accountMatch = authStatus.match(/Logged in to github\.com account (\S+)/);
+        if (accountMatch) {
+          console.log(chalk.green(`  ✓ Authenticated as ${accountMatch[1]}`));
+        } else {
+          console.log(chalk.green(`  ✓ Authenticated`));
+        }
+
+        // Ask which account to use if multiple
+        const { useAccount } = await inquirerPrompt([{
+          type: 'confirm',
+          name: 'useAccount',
+          message: `Create repo with this account?`,
+          default: true,
+        }]);
+
+        if (!useAccount) {
+          console.log(chalk.yellow('\nRun `gh auth login` to switch accounts, then try again.'));
+          process.exit(0);
+        }
+      } catch {
+        console.log(chalk.yellow('  ⚠ Not authenticated with GitHub'));
+        const { login } = await inquirerPrompt([{
+          type: 'confirm',
+          name: 'login',
+          message: 'Login to GitHub now?',
+          default: true,
+        }]);
+
+        if (login) {
+          console.log(chalk.dim('\nOpening GitHub login...\n'));
+          spawnSync('gh', ['auth', 'login'], { stdio: 'inherit' });
+        } else {
+          console.log(chalk.dim('Skipping GitHub repo creation.'));
+          options.github = false;
+        }
+      }
+    }
+
+    // Step 3: Create project directory
+    const projectPath = join(options.path === '.' ? process.cwd() : options.path, name);
+    console.log(chalk.dim(`\nCreating project at ${projectPath}...`));
+
+    if (existsSync(projectPath)) {
+      console.log(chalk.red(`  ✗ Directory already exists: ${projectPath}`));
+      process.exit(1);
+    }
+
+    await mkdir(projectPath, { recursive: true });
+    console.log(chalk.green(`  ✓ Created directory`));
+
+    // Step 4: Initialize git
+    console.log(chalk.dim('\nInitializing git repository...'));
+    execSync('git init', { cwd: projectPath, stdio: 'pipe' });
+    // Copy global git config to local repo
+    try {
+      const globalEmail = execSync('git config --global user.email', { encoding: 'utf-8' }).trim();
+      const globalName = execSync('git config --global user.name', { encoding: 'utf-8' }).trim();
+      if (globalEmail) execSync(`git config user.email "${globalEmail}"`, { cwd: projectPath, stdio: 'pipe' });
+      if (globalName) execSync(`git config user.name "${globalName}"`, { cwd: projectPath, stdio: 'pipe' });
+    } catch {
+      // Global config not set, that's fine
+    }
+    console.log(chalk.green(`  ✓ Git initialized`));
+
+    // Step 5: Create project files based on template
+    console.log(chalk.dim(`\nScaffolding ${options.template} project...`));
+
+    const templates: Record<string, () => Promise<void>> = {
+      typescript: async () => {
+        await writeFile(join(projectPath, 'package.json'), JSON.stringify({
+          name,
+          version: '0.1.0',
+          type: 'module',
+          scripts: {
+            build: 'tsc',
+            dev: 'tsc --watch',
+            test: 'jest',
+          },
+        }, null, 2));
+        await writeFile(join(projectPath, 'tsconfig.json'), JSON.stringify({
+          compilerOptions: {
+            target: 'ES2022',
+            module: 'ESNext',
+            moduleResolution: 'node',
+            esModuleInterop: true,
+            strict: true,
+            outDir: 'dist',
+          },
+          include: ['src'],
+        }, null, 2));
+        await mkdir(join(projectPath, 'src'));
+        await writeFile(join(projectPath, 'src', 'index.ts'), '// Entry point\n\nconsole.log("Hello, world!");\n');
+        await writeFile(join(projectPath, '.gitignore'), 'node_modules/\ndist/\n.env\n');
+      },
+      go: async () => {
+        await writeFile(join(projectPath, 'go.mod'), `module ${name}\n\ngo 1.21\n`);
+        await writeFile(join(projectPath, 'main.go'), `package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("Hello, world!")\n}\n`);
+        await writeFile(join(projectPath, '.gitignore'), `${name}\n*.exe\n.env\n`);
+      },
+      python: async () => {
+        await writeFile(join(projectPath, 'requirements.txt'), '# Add dependencies here\n');
+        await writeFile(join(projectPath, 'main.py'), '#!/usr/bin/env python3\n\ndef main():\n    print("Hello, world!")\n\nif __name__ == "__main__":\n    main()\n');
+        await writeFile(join(projectPath, '.gitignore'), '__pycache__/\n*.pyc\nvenv/\n.env\n');
+        await mkdir(join(projectPath, 'src'));
+        await writeFile(join(projectPath, 'src', '__init__.py'), '');
+      },
+      monorepo: async () => {
+        await writeFile(join(projectPath, 'package.json'), JSON.stringify({
+          name,
+          private: true,
+          workspaces: ['apps/*', 'packages/*'],
+          scripts: {
+            build: 'turbo build',
+            dev: 'turbo dev',
+            test: 'turbo test',
+          },
+        }, null, 2));
+        await mkdir(join(projectPath, 'apps'));
+        await mkdir(join(projectPath, 'packages'));
+        await writeFile(join(projectPath, 'turbo.json'), JSON.stringify({
+          "$schema": "https://turbo.build/schema.json",
+          tasks: { build: {}, dev: { cache: false }, test: {} },
+        }, null, 2));
+        await writeFile(join(projectPath, '.gitignore'), 'node_modules/\ndist/\n.turbo/\n.env\n');
+      },
+    };
+
+    const scaffoldFn = templates[options.template];
+    if (scaffoldFn) {
+      await scaffoldFn();
+      console.log(chalk.green(`  ✓ ${options.template} template created`));
+    } else {
+      console.log(chalk.yellow(`  ⚠ Unknown template: ${options.template}, creating minimal structure`));
+      await writeFile(join(projectPath, '.gitignore'), '.env\n');
+    }
+
+    // Step 6: Create README
+    await writeFile(join(projectPath, 'README.md'), `# ${name}\n\nCreated with [claw](https://github.com/bis-code/claw).\n\n## Getting Started\n\nTODO: Add setup instructions.\n`);
+
+    // Step 7: Create initial commit
+    execSync('git add -A', { cwd: projectPath, stdio: 'pipe' });
+    execSync('git commit -m "Initial commit\n\n🤖 Generated with claw"', { cwd: projectPath, stdio: 'pipe' });
+    console.log(chalk.green(`  ✓ Initial commit created`));
+
+    // Step 8: Create GitHub repo
+    if (options.github !== false) {
+      console.log(chalk.dim('\nCreating GitHub repository...'));
+      try {
+        const visibility = options.private ? '--private' : '--public';
+        execSync(`gh repo create ${name} ${visibility} --source . --remote origin --push`, {
+          cwd: projectPath,
+          stdio: 'pipe',
+        });
+        console.log(chalk.green(`  ✓ GitHub repo created and pushed`));
+      } catch (error) {
+        console.log(chalk.yellow(`  ⚠ Failed to create GitHub repo: ${error instanceof Error ? error.message : error}`));
+        console.log(chalk.dim('    You can create it manually: gh repo create'));
+      }
+    }
+
+    // Step 9: Create Obsidian project folder
+    const obsidianVault = join(homedir(), 'Documents', 'Obsidian');
+    const obsidianProject = join(obsidianVault, 'Projects', name);
+
+    if (existsSync(obsidianVault)) {
+      console.log(chalk.dim('\nCreating Obsidian project folder...'));
+      await mkdir(join(obsidianProject, 'features'), { recursive: true });
+      await writeFile(join(obsidianProject, '_index.md'), `# ${name}\n\nProject created: ${new Date().toISOString().split('T')[0]}\n\n## Features\n\n- Use \`claw feature\` to create features\n\n## Notes\n\n`);
+      console.log(chalk.green(`  ✓ Obsidian folder created`));
+    } else {
+      console.log(chalk.dim('\nObsidian vault not found, skipping folder creation.'));
+    }
+
+    // Step 10: Initialize claw workspace
+    console.log(chalk.dim('\nInitializing claw workspace...'));
+    const { Workspace } = await import('../core/workspace.js');
+    const workspace = new Workspace(projectPath);
+    await workspace.init(false);
+    console.log(chalk.green(`  ✓ claw workspace initialized`));
+
+    // Done!
+    console.log(chalk.green(`\n✅ Project "${name}" created successfully!\n`));
+    console.log(chalk.bold('Next steps:'));
+    console.log(chalk.dim(`  cd ${name}`));
+    console.log(chalk.dim('  claw feature "my first feature"'));
+    console.log(chalk.dim('  claw run --hours 4'));
+  });
+
 // claw init - Initialize workspace
 program
   .command('init')
