@@ -80,9 +80,10 @@ export class FeatureManager {
   /**
    * Create a new feature (simple version - single story)
    */
-  async create(title: string, description?: string): Promise<Feature> {
-    const id = `${this.getDateString()}-${this.slugify(title)}`;
+  async create(title: string, options?: { description?: string; id?: string }): Promise<Feature> {
+    const id = options?.id || `${this.getDateString()}-${this.slugify(title)}`;
     const featurePath = this.getFeaturePath(id);
+    const description = options?.description;
 
     // Create initial story (the whole feature as one story)
     const story: Story = {
@@ -110,6 +111,17 @@ export class FeatureManager {
     await this.obsidian.writeNote(`${featurePath}/_overview`, overviewContent);
 
     return feature;
+  }
+
+  /**
+   * Update an existing feature (saves to Obsidian)
+   */
+  async update(feature: Feature): Promise<void> {
+    const featurePath = this.getFeaturePath(feature.id);
+    feature.updatedAt = new Date();
+
+    const overviewContent = this.generateOverviewContent(feature);
+    await this.obsidian.writeNote(`${featurePath}/_overview`, overviewContent);
   }
 
   /**

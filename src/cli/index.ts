@@ -1293,5 +1293,166 @@ program
     console.log(`     ${chalk.cyan('claw status <feature-id>')}`);
   });
 
+// claw bug - Quick capture a bug to Obsidian
+program
+  .command('bug <description>')
+  .description('Quick capture a bug to the bugs feature in Obsidian')
+  .option('-p, --priority <level>', 'Priority: P0, P1, P2, P3', 'P2')
+  .option('-f, --feature <id>', 'Add to specific feature instead of bugs')
+  .action(async (description, options) => {
+    const { Workspace } = await import('../core/workspace.js');
+    const { FeatureManager } = await import('../core/feature.js');
+    const { homedir } = await import('os');
+
+    const workspace = new Workspace(process.cwd());
+    const config = await workspace.load();
+
+    if (!config) {
+      console.log(chalk.red('✗ Workspace not initialized. Run `claw init` first.'));
+      process.exit(1);
+    }
+
+    const vaultPath = (config.obsidian?.vault || '~/Documents/Obsidian').replace('~', homedir());
+    const projectPath = config.obsidian?.project || `Projects/${config.name}`;
+    const featureManager = new FeatureManager(vaultPath, projectPath);
+
+    // Use specified feature or default to 'bugs'
+    const featureId = options.feature || 'bugs';
+
+    // Check if feature exists, create if not
+    let feature = await featureManager.get(featureId);
+
+    if (!feature) {
+      if (featureId === 'bugs') {
+        // Auto-create bugs feature
+        console.log(chalk.dim('Creating bugs feature...'));
+        feature = await featureManager.create('Bug Tracking', { id: 'bugs' });
+      } else {
+        console.log(chalk.red(`✗ Feature not found: ${featureId}`));
+        console.log(chalk.dim('Use --feature bugs or create the feature first.'));
+        process.exit(1);
+      }
+    }
+
+    // Add bug as a story
+    const storyId = String(feature.stories.length + 1);
+    const story = {
+      id: storyId,
+      title: `[${options.priority}] ${description}`,
+      status: 'pending' as const,
+      scope: [description],
+      repos: [],
+    };
+
+    feature.stories.push(story);
+    await featureManager.update(feature);
+
+    console.log(chalk.green(`✓ Bug captured: ${description}`));
+    console.log(chalk.dim(`  Feature: ${featureId}`));
+    console.log(chalk.dim(`  Story: #${storyId}`));
+    console.log(chalk.dim(`  Priority: ${options.priority}`));
+    console.log('');
+    console.log(chalk.dim(`Run \`claw run ${featureId}\` to work on bugs.`));
+  });
+
+// claw issue - Export a story to GitHub Issue (for team visibility)
+program
+  .command('issue <feature> [story]')
+  .description('Export a story to GitHub Issue (optional, for team visibility)')
+  .option('-l, --labels <labels>', 'Comma-separated labels', 'bug,claude-ready')
+  .action(async (featureId, storyId, options) => {
+    const { Workspace } = await import('../core/workspace.js');
+    const { FeatureManager } = await import('../core/feature.js');
+    const { GitHubClient } = await import('../integrations/github.js');
+    const { homedir } = await import('os');
+    const inquirerModule = await import('inquirer');
+    const inquirerPrompt = inquirerModule.default.prompt;
+
+    const workspace = new Workspace(process.cwd());
+    const config = await workspace.load();
+
+    if (!config) {
+      console.log(chalk.red('✗ Workspace not initialized. Run `claw init` first.'));
+      process.exit(1);
+    }
+
+    const vaultPath = (config.obsidian?.vault || '~/Documents/Obsidian').replace('~', homedir());
+    const projectPath = config.obsidian?.project || `Projects/${config.name}`;
+    const featureManager = new FeatureManager(vaultPath, projectPath);
+
+    // Get feature
+    const feature = await featureManager.get(featureId);
+    if (!feature) {
+      console.log(chalk.red(`✗ Feature not found: ${featureId}`));
+      process.exit(1);
+    }
+
+    // Get story (or let user pick)
+    let story;
+    if (storyId) {
+      story = feature.stories.find(s => s.id === storyId);
+      if (!story) {
+        console.log(chalk.red(`✗ Story not found: ${storyId}`));
+        process.exit(1);
+      }
+    } else {
+      // Let user pick a story
+      const pendingStories = feature.stories.filter(s => s.status === 'pending');
+      if (pendingStories.length === 0) {
+        console.log(chalk.yellow('No pending stories to export.'));
+        process.exit(0);
+      }
+
+      const { selectedStory } = await inquirerPrompt([{
+        type: 'list',
+        name: 'selectedStory',
+        message: 'Select story to export to GitHub:',
+        choices: pendingStories.map(s => ({
+          name: `#${s.id} - ${s.title}`,
+          value: s.id,
+        })),
+      }]);
+      story = feature.stories.find(s => s.id === selectedStory)!;
+    }
+
+    // Check GitHub auth
+    const github = new GitHubClient(process.cwd());
+    const isAuth = await github.isAuthenticated();
+    if (!isAuth) {
+      console.log(chalk.red('✗ Not authenticated with GitHub. Run `gh auth login`.'));
+      process.exit(1);
+    }
+
+    // Create GitHub issue
+    console.log(chalk.dim(`\nExporting to GitHub Issue...`));
+
+    const labels = options.labels.split(',').map((l: string) => l.trim());
+    const issueBody = `## Description
+
+${story.scope || story.title}
+
+## Source
+
+- **Feature:** ${feature.title} (\`${feature.id}\`)
+- **Story:** #${story.id}
+- **Obsidian:** ${projectPath}/features/${feature.id}/_overview.md
+
+---
+
+*Exported from claw*`;
+
+    try {
+      const issue = await github.createIssue(story.title, issueBody, labels);
+      console.log(chalk.green(`✓ GitHub Issue created: #${issue.number}`));
+      console.log(chalk.dim(`  https://github.com/.../${issue.number}`));
+      console.log('');
+      console.log(chalk.dim('Note: The story remains in Obsidian as source of truth.'));
+      console.log(chalk.dim('The GitHub issue is for team visibility only.'));
+    } catch (error) {
+      console.log(chalk.red(`✗ Failed to create issue: ${error instanceof Error ? error.message : error}`));
+      process.exit(1);
+    }
+  });
+
 // Parse and run
 program.parse();
