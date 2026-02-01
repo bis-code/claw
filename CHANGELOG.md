@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/bis-code/claw/compare/v1.6.0...v1.7.0) (2026-02-01)
+
+
+### Features
+
+* **cli:** add migrate and new commands ([#43](https://github.com/bis-code/claw/issues/43)) ([588362e](https://github.com/bis-code/claw/commit/588362efd5e8a36de0e5d2e4e11acf5b8f9e9511))
+
 ## [1.6.0](https://github.com/bis-code/claw/compare/v1.5.0...v1.6.0) (2026-01-31)
 
 
