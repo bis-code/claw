@@ -2,76 +2,28 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
-    branches: [main, develop]
+    branches: [main]
 
 jobs:
-  test:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
+  build:
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Configure git for tests
-        run: |
-          git config --global user.email "ci@github.com"
-          git config --global user.name "GitHub Actions"
-
-      - name: Setup BATS
-        run: |
-          git clone --depth 1 https://github.com/bats-core/bats-core.git tests/bats
-          git clone --depth 1 https://github.com/bats-core/bats-support.git tests/test_helper/bats-support
-          git clone --depth 1 https://github.com/bats-core/bats-assert.git tests/test_helper/bats-assert
-
-      - name: Setup Python 3.13
-        uses: actions/setup-python@v5
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          python-version: '3.13'
+          node-version: '20'
+          cache: 'npm'
 
-      - name: Setup uv
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Add uv to PATH
-        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
+      - name: Build
+        run: npm run build
 
-      - name: Install LEANN
-        continue-on-error: true
-        run: |
-          source ~/.bashrc 2>/dev/null || true
-          export PATH="$HOME/.local/bin:$PATH"
-          uv tool install leann || echo "LEANN installation failed, tests will skip"
-
-      - name: Run unit tests
-        run: ./tests/bats/bin/bats tests/detect_project.bats tests/project_types.bats tests/agents.bats tests/boolean_params.bats
-
-      - name: Run utility tests
-        run: ./tests/bats/bin/bats tests/utils.bats tests/output.bats tests/files.bats
-
-      - name: Run integration tests
-        run: ./tests/bats/bin/bats tests/integration.bats tests/edge_cases.bats tests/integration_project.bats
-
-      - name: Run CLI tests
-        run: ./tests/bats/bin/bats tests/claw_cli.bats tests/home.bats tests/manifest.bats tests/issue_templates.bats
-
-      - name: Run project tests
-        run: ./tests/bats/bin/bats tests/projects.bats tests/multi_repo.bats
-
-      - name: Run autonomous tests
-        run: ./tests/bats/bin/bats tests/autonomous/
-
-      - name: Run external dependency tests
-        run: ./tests/bats/bin/bats tests/external_deps.bats
-
-      - name: Run LEANN tests
-        continue-on-error: true
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          ./tests/bats/bin/bats tests/leann.bats tests/leann_mcp.bats || echo "LEANN tests skipped"
-
-      - name: Run real-world tests
-        run: ./tests/bats/bin/bats tests/real_world.bats
+      - name: Run tests
+        run: npm test
