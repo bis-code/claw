@@ -157,25 +157,24 @@ function copySkills(targetDir: string): number {
   if (!existsSync(skillsSource)) {
     // Create default skills if templates don't exist yet
     const defaultSkills = {
-      'SKILL.md': `# Skill: claw
+      'SKILL.md': `# Claw - Work Management
 
-Work management for Claude Code with 4 commands.
+Simple work management with 4 commands.
 
-## Trigger
-- \`/claw-run\` - Start a work session
-- \`/claw-bug\` - Report a bug
-- \`/claw-feature\` - Propose a new feature
-- \`/claw-improve\` - Suggest an improvement
+## Commands
+
+| Command | Purpose |
+|---------|---------|
+| \`/claw-run\` | Start a work session |
+| \`/claw-bug\` | Report a bug |
+| \`/claw-feature\` | Propose a new feature |
+| \`/claw-improve\` | Suggest an improvement |
 
 ## Description
-Simple work management system that tracks bugs, features, and improvements in Obsidian (and optionally GitHub in team mode).
-`,
-      'claw-run.md': `---
-name: claw-run
-description: Start a work session
----
 
-# /claw-run
+Track bugs, features, and improvements in Obsidian (and optionally GitHub in team mode).
+`,
+      'claw-run.md': `# /claw-run
 
 Select items from Obsidian (bugs, features, improvements) and execute them autonomously.
 
@@ -194,12 +193,7 @@ Select items from Obsidian (bugs, features, improvements) and execute them auton
 
 Check progress markers and continue from where you left off.
 `,
-      'claw-bug.md': `---
-name: claw-bug
-description: Report a bug
----
-
-# /claw-bug
+      'claw-bug.md': `# /claw-bug
 
 Create a bug report in Obsidian (and optionally GitHub in team mode).
 
@@ -211,12 +205,7 @@ Create a bug report in Obsidian (and optionally GitHub in team mode).
 4. Create bug note in Obsidian: \`bugs/<slug>.md\`
 5. If team mode: also create GitHub issue
 `,
-      'claw-feature.md': `---
-name: claw-feature
-description: Propose a new feature
----
-
-# /claw-feature
+      'claw-feature.md': `# /claw-feature
 
 Create a feature request in Obsidian (and optionally GitHub in team mode).
 
@@ -228,12 +217,7 @@ Create a feature request in Obsidian (and optionally GitHub in team mode).
 4. Create feature note in Obsidian: \`features/<slug>.md\`
 5. If team mode: also create GitHub issue
 `,
-      'claw-improve.md': `---
-name: claw-improve
-description: Suggest an improvement
----
-
-# /claw-improve
+      'claw-improve.md': `# /claw-improve
 
 Create an improvement (refactor, tech-debt, performance, coverage) in Obsidian.
 
