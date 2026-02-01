@@ -1,41 +1,46 @@
-// Claw v2 - Orchestration layer for autonomous AI development
-// Main exports for programmatic usage
+// Claw v3 - Minimal bootstrapper for Claude Code skills
+// No exports needed - this is just a CLI tool
 
-// Core modules
-export { Workspace, type WorkspaceConfig, type Repo, type RepoRelationship, type RepoContext, type CrossRepoContext, type MultiRepoCommit } from './core/workspace.js';
-export { FeatureManager, type Feature, type Story, type StoryStatus, type BreakdownOption } from './core/feature.js';
-export { SessionRunner, type SessionConfig, type SessionResult, type SessionState } from './core/session.js';
-export { DiscoveryEngine, type DiscoveryResult, type Finding, type DiscoveryMode, type DiscoveryOptions } from './core/discovery.js';
-export { BreakdownGenerator, type BreakdownApproach, type ProposedStory, type BreakdownContext } from './core/breakdown.js';
-export { StoryRefiner, type RefinementAction, type RefinementResult } from './core/refinement.js';
-export { DependencyManager, type DependencyNode, type DependencyGraph } from './core/dependencies.js';
-export { IterationEngine, type IterationConfig, type IterationState, type IterationResult, type StuckAnalysis } from './core/iteration.js';
-export { CheckpointManager, type CheckpointData } from './core/checkpoint.js';
-export { HotkeyManager, type HotkeyAction, type HotkeyHandler, type HotkeyManagerOptions, createHotkeyAwareSpinner } from './core/hotkeys.js';
-export { ProgressReporter, createSpinner, type ProgressEvent, type ProgressStats, type ProgressCallback } from './core/progress.js';
-export {
-  validateWorkspaceConfig,
-  validateSessionConfig,
-  validateFeature,
-  validateStory,
-  formatValidationResult,
-  assertValid,
-  type ValidationResult,
-  type ValidationError,
-  type ValidationWarning,
-} from './core/validation.js';
-export {
-  convertFile,
-  scanForConvertible,
-  isConvertible,
-  parseMarkdownToStories,
-  generateOverviewContent,
-  type ConversionResult,
-  type ConvertedStory,
-  type ConversionOptions,
-} from './core/converter.js';
+// Re-export types for programmatic usage if needed
+export interface AppConfig {
+  path: string;
+  devCommand: string;
+  devUrl: string;
+  e2eCommand?: string;
+}
 
-// Integrations
-export { ObsidianClient, type ObsidianNote } from './integrations/obsidian.js';
-export { GitHubClient, type GitHubIssue, type GitHubPR } from './integrations/github.js';
-export { ClaudeClient, type ClaudeSession, type ClaudeOutput, CLAW_MARKERS } from './integrations/claude.js';
+export interface ClawConfig {
+  mode: 'solo' | 'team';
+  workMode: 'careful' | 'fast';
+  source: {
+    obsidian: boolean;
+    github: boolean;
+  };
+  create: {
+    obsidian: boolean;
+    github: boolean;
+  };
+  obsidian: {
+    vault: string;
+    project: string;
+  };
+  github?: {
+    labels: {
+      bug: string;
+      feature: string;
+      improvement: string;
+    };
+  };
+  autoClose: 'ask' | 'never' | 'always';
+  apps: Record<string, AppConfig>;
+  testing: {
+    tdd: boolean;
+    runner: string;
+    e2e: {
+      tool: string;
+      browser: string;
+      headed: boolean;
+      screenshotOnFail: boolean;
+    };
+  };
+}
