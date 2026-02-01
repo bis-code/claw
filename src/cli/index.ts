@@ -130,51 +130,58 @@ function setupGlobalGitignore(): void {
 }
 
 // Copy skills to target directory
+// Each skill needs its own directory with SKILL.md as entrypoint
 function copySkills(targetDir: string): number {
   const skillsSource = join(__dirname, '../../templates/skills');
-  const skillsTarget = join(targetDir, '.claude/skills/claw');
+  const skillsDir = join(targetDir, '.claude/skills');
 
-  // Create target directory (skills must be in a named subdirectory)
-  mkdirSync(skillsTarget, { recursive: true });
+  // Skill names
+  const skills = ['claw-run', 'claw-bug', 'claw-feature', 'claw-improve'];
 
-  // Clean up old skill files from previous versions (v1/v2 format)
-  const oldSkillsDir = join(targetDir, '.claude/skills');
-  const oldSkillFiles = [
-    // Old v1/v2 skills at root level
+  // Clean up old formats
+  const oldFiles = [
     'bug.md', 'feature.md', 'improvement.md', 'brainstorm.md', 'run.md',
     'report-bug.md', 'new-feature.md', 'new-improvement.md', 'SKILL.md',
-    // v3 files that were incorrectly placed at root level
     'claw-run.md', 'claw-bug.md', 'claw-feature.md', 'claw-improve.md'
   ];
-  for (const oldSkill of oldSkillFiles) {
-    const oldPath = join(oldSkillsDir, oldSkill);
-    if (existsSync(oldPath)) {
-      unlinkSync(oldPath);
+  for (const file of oldFiles) {
+    const path = join(skillsDir, file);
+    if (existsSync(path)) unlinkSync(path);
+  }
+
+  // Clean up old claw/ directory
+  const oldClawDir = join(skillsDir, 'claw');
+  if (existsSync(oldClawDir)) {
+    try {
+      const files = readdirSync(oldClawDir);
+      for (const f of files) unlinkSync(join(oldClawDir, f));
+      rmdirSync(oldClawDir);
+    } catch { /* ignore */ }
+  }
+
+  // Create each skill directory with SKILL.md
+  for (const skill of skills) {
+    const skillDir = join(skillsDir, skill);
+    mkdirSync(skillDir, { recursive: true });
+
+    const sourceFile = join(skillsSource, `${skill}.md`);
+    const targetFile = join(skillDir, 'SKILL.md');
+
+    if (existsSync(sourceFile)) {
+      copyFileSync(sourceFile, targetFile);
+    } else {
+      // Fallback content
+      const content = getDefaultSkillContent(skill);
+      writeFileSync(targetFile, content);
     }
   }
 
-  // Check if source exists
-  if (!existsSync(skillsSource)) {
-    // Create default skills if templates don't exist yet
-    const defaultSkills = {
-      'SKILL.md': `# Claw - Work Management
+  return skills.length;
+}
 
-Simple work management with 4 commands.
-
-## Commands
-
-| Command | Purpose |
-|---------|---------|
-| \`/claw-run\` | Start a work session |
-| \`/claw-bug\` | Report a bug |
-| \`/claw-feature\` | Propose a new feature |
-| \`/claw-improve\` | Suggest an improvement |
-
-## Description
-
-Track bugs, features, and improvements in Obsidian (and optionally GitHub in team mode).
-`,
-      'claw-run.md': `# /claw-run
+function getDefaultSkillContent(skill: string): string {
+  const defaults: Record<string, string> = {
+    'claw-run': `# /claw-run
 
 Select items from Obsidian (bugs, features, improvements) and execute them autonomously.
 
@@ -185,15 +192,12 @@ Select items from Obsidian (bugs, features, improvements) and execute them auton
 3. Let user select items to work on
 4. Create \`.claw-session.md\` with selected items
 5. Work through each item, updating progress
-6. On completion, ask about closing issues (if configured)
 
 ## Session Recovery
 
 **CRITICAL: After context compaction, read \`.claw-session.md\` to recover state.**
-
-Check progress markers and continue from where you left off.
 `,
-      'claw-bug.md': `# /claw-bug
+    'claw-bug': `# /claw-bug
 
 Create a bug report in Obsidian (and optionally GitHub in team mode).
 
@@ -201,11 +205,10 @@ Create a bug report in Obsidian (and optionally GitHub in team mode).
 
 1. Ask user for bug description
 2. Ask for priority (P0-P3)
-3. Ask if screenshot needed
-4. Create bug note in Obsidian: \`bugs/<slug>.md\`
-5. If team mode: also create GitHub issue
+3. Create bug note in Obsidian: \`bugs/<slug>.md\`
+4. If team mode: also create GitHub issue
 `,
-      'claw-feature.md': `# /claw-feature
+    'claw-feature': `# /claw-feature
 
 Create a feature request in Obsidian (and optionally GitHub in team mode).
 
@@ -213,20 +216,12 @@ Create a feature request in Obsidian (and optionally GitHub in team mode).
 
 1. Ask user for feature description
 2. Ask clarifying questions about scope
-3. Ask if E2E tests needed
-4. Create feature note in Obsidian: \`features/<slug>.md\`
-5. If team mode: also create GitHub issue
+3. Create feature note in Obsidian: \`features/<slug>.md\`
+4. If team mode: also create GitHub issue
 `,
-      'claw-improve.md': `# /claw-improve
+    'claw-improve': `# /claw-improve
 
 Create an improvement (refactor, tech-debt, performance, coverage) in Obsidian.
-
-## Scope
-
-- **Refactors** - restructure code, no behavior change
-- **Tech-debt** - clean up TODOs, hacks, outdated patterns
-- **Performance** - optimizations, speed improvements
-- **Code coverage** - add missing tests
 
 ## Flow
 
@@ -234,46 +229,9 @@ Create an improvement (refactor, tech-debt, performance, coverage) in Obsidian.
 2. Ask for category (refactor/tech-debt/performance/coverage)
 3. Create improvement note in Obsidian: \`improvements/<slug>.md\`
 4. If team mode: also create GitHub issue
-
-## Improvement Note Format
-
-\`\`\`markdown
-# Improvement: <title>
-
-**Category:** <category>
-**Status:** pending
-**Created:** <date>
-
-## Description
-
-<description>
-
-## Approach
-
-...
-\`\`\`
 `,
-    };
-
-    for (const [name, content] of Object.entries(defaultSkills)) {
-      writeFileSync(join(skillsTarget, name), content);
-    }
-
-    return Object.keys(defaultSkills).length;
-  }
-
-  // Copy from templates
-  const files = readdirSync(skillsSource);
-  let count = 0;
-
-  for (const file of files) {
-    if (file.endsWith('.md')) {
-      copyFileSync(join(skillsSource, file), join(skillsTarget, file));
-      count++;
-    }
-  }
-
-  return count;
+  };
+  return defaults[skill] || `# /${skill}\n\nSkill content.`;
 }
 
 // Create config file
