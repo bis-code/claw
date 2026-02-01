@@ -27,6 +27,17 @@ export interface WorkspaceConfig {
     createIssues: boolean;
     createPRs: boolean;
   };
+  /** What Claude is allowed to do autonomously */
+  permissions?: {
+    /** Allow Claude to make git commits */
+    commit: boolean;
+    /** Allow Claude to push to remote */
+    push: boolean;
+    /** Allow Claude to create pull requests */
+    createPR: boolean;
+    /** Allow Claude to create GitHub issues */
+    createIssue: boolean;
+  };
 }
 
 export interface RepoRelationship {

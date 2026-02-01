@@ -451,12 +451,99 @@ program
         console.log(chalk.yellow('Aborted. Edit claw-workspace.json manually or run again.'));
         return;
       }
+
+      // Ask about Claude permissions
+      console.log(chalk.blue('\n🔒 Claude Permissions'));
+      console.log(chalk.dim('What should Claude be allowed to do autonomously?\n'));
+
+      const { permissions } = await inquirer.default.prompt([{
+        type: 'checkbox',
+        name: 'permissions',
+        message: 'Select what Claude can do:',
+        choices: [
+          { name: 'Make git commits', value: 'commit', checked: true },
+          { name: 'Push to remote', value: 'push', checked: false },
+          { name: 'Create pull requests', value: 'createPR', checked: false },
+          { name: 'Create GitHub issues', value: 'createIssue', checked: false },
+        ],
+      }]);
+
+      config.permissions = {
+        commit: permissions.includes('commit'),
+        push: permissions.includes('push'),
+        createPR: permissions.includes('createPR'),
+        createIssue: permissions.includes('createIssue'),
+      };
+
+      console.log(chalk.dim('\nPermissions saved. You can change these in claw-workspace.json'));
+    } else {
+      // Default permissions for --yes flag (conservative)
+      config.permissions = {
+        commit: true,
+        push: false,
+        createPR: false,
+        createIssue: false,
+      };
     }
 
     // Save config
     await workspace.save(config);
     console.log(chalk.green(`\n✓ Workspace initialized: ${workspace.getConfigPath()}`));
     console.log(chalk.dim('Run `claw feature "description"` to start a feature.'));
+  });
+
+// claw config - Configure workspace permissions
+program
+  .command('config')
+  .description('Configure Claude permissions and workspace settings')
+  .action(async () => {
+    const { Workspace } = await import('../core/workspace.js');
+    const inquirer = await import('inquirer');
+
+    const workspace = new Workspace(process.cwd());
+    const config = await workspace.load();
+
+    if (!config) {
+      console.log(chalk.red('✗ Workspace not initialized. Run `claw init` first.'));
+      process.exit(1);
+    }
+
+    console.log(chalk.blue('\n🔒 Claude Permissions\n'));
+
+    const currentPerms = config.permissions || {
+      commit: true,
+      push: false,
+      createPR: false,
+      createIssue: false,
+    };
+
+    const { permissions } = await inquirer.default.prompt([{
+      type: 'checkbox',
+      name: 'permissions',
+      message: 'What should Claude be allowed to do?',
+      choices: [
+        { name: 'Make git commits', value: 'commit', checked: currentPerms.commit },
+        { name: 'Push to remote', value: 'push', checked: currentPerms.push },
+        { name: 'Create pull requests', value: 'createPR', checked: currentPerms.createPR },
+        { name: 'Create GitHub issues', value: 'createIssue', checked: currentPerms.createIssue },
+      ],
+    }]);
+
+    config.permissions = {
+      commit: permissions.includes('commit'),
+      push: permissions.includes('push'),
+      createPR: permissions.includes('createPR'),
+      createIssue: permissions.includes('createIssue'),
+    };
+
+    await workspace.save(config);
+
+    console.log(chalk.green('\n✓ Permissions updated'));
+    console.log(chalk.dim('\nCurrent settings:'));
+    console.log(`  Commit:       ${config.permissions.commit ? chalk.green('✓') : chalk.red('✗')}`);
+    console.log(`  Push:         ${config.permissions.push ? chalk.green('✓') : chalk.red('✗')}`);
+    console.log(`  Create PR:    ${config.permissions.createPR ? chalk.green('✓') : chalk.red('✗')}`);
+    console.log(`  Create Issue: ${config.permissions.createIssue ? chalk.green('✓') : chalk.red('✗')}`);
   });
 
 // claw feature - Create and run a feature
@@ -698,39 +785,54 @@ program
         }
       }
 
-      // Main interaction loop
+      // Main interaction loop - list-based navigation
       let continueLoop = true;
-      let selectedStories: StoryChoice[] = [];
+      let selectedForRun: StoryChoice[] = [];
 
       while (continueLoop) {
-        // Rebuild choices each iteration (in case stories were modified)
+        // Show current selection status
+        if (selectedForRun.length > 0) {
+          console.log(chalk.green(`\n✓ ${selectedForRun.length} story(ies) selected for run`));
+        }
+
+        // Build list of stories for browsing
         const storyChoices = allStories.map((item, idx) => {
           const statusIcon = item.story.status === 'in_progress' ? '🔄' : '⏳';
+          const isSelected = selectedForRun.some(s => s.story.id === item.story.id && s.feature.id === item.feature.id);
+          const selectedMark = isSelected ? chalk.green('✓ ') : '  ';
           const featureLabel = chalk.dim(`[${item.feature.title}]`);
+          // Truncate long titles
+          const title = item.story.title.length > 60
+            ? item.story.title.substring(0, 57) + '...'
+            : item.story.title;
           return {
-            name: `${statusIcon} ${item.story.title} ${featureLabel}`,
+            name: `${selectedMark}${statusIcon} ${title} ${featureLabel}`,
             value: idx,
-            checked: selectedStories.some(s => s.story.id === item.story.id && s.feature.id === item.feature.id),
           };
         });
 
-        // Add management options at the bottom
+        // Add action options
         const allChoices: any[] = [
           ...storyChoices,
           new inquirerModule.default.Separator('─────────────────────────────────'),
-          { name: chalk.green('➕ Add new bug/feature'), value: 'add', checked: false },
+          { name: chalk.green('➕ Add new bug/feature'), value: 'add' },
+          ...(selectedForRun.length > 0 ? [
+            { name: chalk.blue(`▶️  Run ${selectedForRun.length} selected`), value: 'run_selected' },
+            { name: chalk.dim('↩️  Clear selection'), value: 'clear' },
+          ] : []),
+          { name: chalk.blue('▶️  Run all pending'), value: 'run_all' },
         ];
 
-        const { selected } = await inquirerPrompt([{
-          type: 'checkbox',
-          name: 'selected',
-          message: 'Select stories to work on:',
+        const { choice } = await inquirerPrompt([{
+          type: 'list',
+          name: 'choice',
+          message: 'Browse stories (select to see options):',
           choices: allChoices,
-          pageSize: 15,
+          pageSize: 20,
         }]);
 
-        // Handle 'add' option
-        if (selected.includes('add')) {
+        // Handle global actions
+        if (choice === 'add') {
           const { newWork } = await inquirerPrompt([{
             type: 'input',
             name: 'newWork',
@@ -763,119 +865,25 @@ program
               console.log(chalk.green(`  ✓ Added feature: "${newWork.trim()}"`));
             }
           }
-          continue; // Go back to selection
-        }
-
-        // Get selected story indices
-        const selectedIndices = selected.filter((s: any) => typeof s === 'number') as number[];
-        selectedStories = selectedIndices.map(idx => allStories[idx]);
-
-        if (selectedStories.length === 0) {
-          console.log(chalk.yellow('No stories selected.'));
-          return;
-        }
-
-        // Action menu
-        const { action } = await inquirerPrompt([{
-          type: 'list',
-          name: 'action',
-          message: `${selectedStories.length} story(ies) selected. What do you want to do?`,
-          choices: [
-            { name: '▶️  Run selected stories', value: 'run' },
-            { name: '👁️  View details', value: 'view' },
-            { name: '✏️  Edit story', value: 'edit' },
-            { name: '🗑️  Remove story', value: 'remove' },
-            { name: '↩️  Back to selection', value: 'back' },
-          ],
-        }]);
-
-        if (action === 'back') {
           continue;
         }
 
-        if (action === 'view') {
-          for (const item of selectedStories) {
-            console.log(chalk.blue('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
-            console.log(chalk.bold(`📋 ${item.story.title}`));
-            console.log(chalk.blue('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
-            console.log(`${chalk.dim('Feature:')} ${item.feature.title}`);
-            console.log(`${chalk.dim('Status:')}  ${item.story.status}`);
-            console.log(`${chalk.dim('ID:')}      ${item.feature.id}/${item.story.id}`);
-            if (item.story.branch) {
-              console.log(`${chalk.dim('Branch:')}  ${item.story.branch}`);
-            }
-            console.log(chalk.dim('\nScope:'));
-            item.story.scope.forEach(s => console.log(`  - ${s}`));
-            if (item.story.blockedBy && item.story.blockedBy.length > 0) {
-              console.log(chalk.dim('\nBlocked by:'));
-              item.story.blockedBy.forEach(b => console.log(`  - ${b}`));
-            }
-          }
-          console.log('');
+        if (choice === 'clear') {
+          selectedForRun = [];
+          console.log(chalk.dim('Selection cleared.'));
           continue;
         }
 
-        if (action === 'edit') {
-          const item = selectedStories[0]; // Edit first selected
-          console.log(chalk.dim(`\nEditing: ${item.story.title}\n`));
-
-          const { newTitle } = await inquirerPrompt([{
-            type: 'input',
-            name: 'newTitle',
-            message: 'New title (leave empty to keep):',
-            default: item.story.title,
-          }]);
-
-          const { newScope } = await inquirerPrompt([{
-            type: 'input',
-            name: 'newScope',
-            message: 'New scope (comma-separated, leave empty to keep):',
-            default: item.story.scope.join(', '),
-          }]);
-
-          // Update the story
-          item.story.title = newTitle || item.story.title;
-          item.story.scope = newScope ? newScope.split(',').map((s: string) => s.trim()) : item.story.scope;
-
-          await featureManager.updateStory(item.feature.id, item.story.id, {
-            title: item.story.title,
-            scope: item.story.scope,
-          });
-          console.log(chalk.green('  ✓ Story updated'));
-          continue;
+        if (choice === 'run_all') {
+          selectedForRun = [...allStories];
+          // Fall through to run
         }
 
-        if (action === 'remove') {
-          const { confirmRemove } = await inquirerPrompt([{
-            type: 'confirm',
-            name: 'confirmRemove',
-            message: `Remove ${selectedStories.length} story(ies)? This cannot be undone.`,
-            default: false,
-          }]);
-
-          if (confirmRemove) {
-            for (const item of selectedStories) {
-              // Remove from feature
-              const feature = await featureManager.get(item.feature.id);
-              if (feature) {
-                feature.stories = feature.stories.filter(s => s.id !== item.story.id);
-                await featureManager.update(feature);
-              }
-              // Remove from local list
-              allStories = allStories.filter(s => !(s.story.id === item.story.id && s.feature.id === item.feature.id));
-            }
-            selectedStories = [];
-            console.log(chalk.green(`  ✓ Removed ${selectedStories.length} story(ies)`));
-          }
-          continue;
-        }
-
-        if (action === 'run') {
+        if (choice === 'run_selected' || choice === 'run_all') {
           // Group selected stories by feature
           const featureMap = new Map<string, typeof featuresWithPending[0]>();
-          for (const item of selectedStories) {
+          for (const item of selectedForRun) {
             if (!featureMap.has(item.feature.id)) {
-              // Clone feature with only selected stories
               const featureCopy = { ...item.feature, stories: [] as typeof item.feature.stories };
               featureMap.set(item.feature.id, featureCopy);
             }
@@ -883,10 +891,9 @@ program
           }
           selectedFeatures = Array.from(featureMap.values());
 
-          // Summary and confirm
           console.log(chalk.dim('\n─────────────────────────────────'));
           console.log(chalk.bold('Session Summary:'));
-          console.log(`  Stories:  ${selectedStories.length}`);
+          console.log(`  Stories:  ${selectedForRun.length}`);
           console.log(`  Mode:     Run until blocked`);
           console.log(chalk.dim('─────────────────────────────────\n'));
 
@@ -897,11 +904,141 @@ program
             default: true,
           }]);
 
-          if (!confirm) {
+          if (confirm) {
+            continueLoop = false;
+          }
+          continue;
+        }
+
+        // User selected a specific story - show action menu
+        if (typeof choice === 'number') {
+          const item = allStories[choice];
+
+          // Show story details first
+          console.log(chalk.blue('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+          console.log(chalk.bold(`📋 ${item.story.title}`));
+          console.log(chalk.blue('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'));
+          console.log(`${chalk.dim('Feature:')} ${item.feature.title}`);
+          console.log(`${chalk.dim('Status:')}  ${item.story.status}`);
+          console.log(`${chalk.dim('ID:')}      ${item.feature.id}/${item.story.id}`);
+          if (item.story.branch) {
+            console.log(`${chalk.dim('Branch:')}  ${item.story.branch}`);
+          }
+          console.log(chalk.dim('\nScope:'));
+          item.story.scope.forEach(s => console.log(`  - ${s}`));
+          if (item.story.blockedBy && item.story.blockedBy.length > 0) {
+            console.log(chalk.dim('\nBlocked by:'));
+            item.story.blockedBy.forEach(b => console.log(`  - ${b}`));
+          }
+          console.log('');
+
+          // Show action menu for this story
+          const isAlreadySelected = selectedForRun.some(s => s.story.id === item.story.id && s.feature.id === item.feature.id);
+
+          const { action } = await inquirerPrompt([{
+            type: 'list',
+            name: 'action',
+            message: 'What do you want to do?',
+            choices: [
+              isAlreadySelected
+                ? { name: '➖ Remove from run queue', value: 'deselect' }
+                : { name: '➕ Add to run queue', value: 'select' },
+              { name: '▶️  Run this story now', value: 'run_now' },
+              { name: '📂 Open in Obsidian', value: 'open_obsidian' },
+              { name: '✏️  Edit story', value: 'edit' },
+              { name: '🗑️  Remove story', value: 'remove' },
+              { name: '↩️  Back to list', value: 'back' },
+            ],
+          }]);
+
+          if (action === 'back') {
             continue;
           }
 
-          continueLoop = false; // Exit loop and run
+          if (action === 'select') {
+            selectedForRun.push(item);
+            console.log(chalk.green(`  ✓ Added to run queue`));
+            continue;
+          }
+
+          if (action === 'deselect') {
+            selectedForRun = selectedForRun.filter(s => !(s.story.id === item.story.id && s.feature.id === item.feature.id));
+            console.log(chalk.dim('  Removed from run queue'));
+            continue;
+          }
+
+          if (action === 'run_now') {
+            selectedForRun = [item];
+            const featureCopy = { ...item.feature, stories: [item.story] };
+            selectedFeatures = [featureCopy];
+            continueLoop = false;
+            continue;
+          }
+
+          if (action === 'open_obsidian') {
+            const { exec } = await import('child_process');
+            const notePath = `${vaultPath}/${projectPath}/features/${item.feature.id}/_overview.md`;
+            // Open in Obsidian using obsidian:// URI
+            const obsidianUri = `obsidian://open?vault=${encodeURIComponent(vaultPath.split('/').pop() || 'Obsidian')}&file=${encodeURIComponent(`${projectPath}/features/${item.feature.id}/_overview`)}`;
+            exec(`open "${obsidianUri}"`, (err) => {
+              if (err) {
+                console.log(chalk.yellow(`  Could not open Obsidian. File path: ${notePath}`));
+              } else {
+                console.log(chalk.green(`  ✓ Opened in Obsidian`));
+              }
+            });
+            continue;
+          }
+
+          if (action === 'edit') {
+            console.log(chalk.dim(`\nEditing: ${item.story.title}\n`));
+
+            const { newTitle } = await inquirerPrompt([{
+              type: 'input',
+              name: 'newTitle',
+              message: 'New title (leave empty to keep):',
+              default: item.story.title,
+            }]);
+
+            const { newScope } = await inquirerPrompt([{
+              type: 'input',
+              name: 'newScope',
+              message: 'New scope (comma-separated, leave empty to keep):',
+              default: item.story.scope.join(', '),
+            }]);
+
+            // Update the story
+            item.story.title = newTitle || item.story.title;
+            item.story.scope = newScope ? newScope.split(',').map((s: string) => s.trim()) : item.story.scope;
+
+            await featureManager.updateStory(item.feature.id, item.story.id, {
+              title: item.story.title,
+              scope: item.story.scope,
+            });
+            console.log(chalk.green('  ✓ Story updated'));
+            continue;
+          }
+
+          if (action === 'remove') {
+            const { confirmRemove } = await inquirerPrompt([{
+              type: 'confirm',
+              name: 'confirmRemove',
+              message: 'Remove this story? This cannot be undone.',
+              default: false,
+            }]);
+
+            if (confirmRemove) {
+              const feature = await featureManager.get(item.feature.id);
+              if (feature) {
+                feature.stories = feature.stories.filter(s => s.id !== item.story.id);
+                await featureManager.update(feature);
+              }
+              allStories = allStories.filter(s => !(s.story.id === item.story.id && s.feature.id === item.feature.id));
+              selectedForRun = selectedForRun.filter(s => !(s.story.id === item.story.id && s.feature.id === item.feature.id));
+              console.log(chalk.green('  ✓ Story removed'));
+            }
+            continue;
+          }
         }
       }
     }
