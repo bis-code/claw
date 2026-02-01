@@ -1,6 +1,6 @@
 {
   "name": "@bis-code/claw",
-  "version": "3.2.1",
+  "version": "3.2.2",
   "description": "Claude Automated Workflow - Orchestration layer for autonomous AI development",
   "type": "module",
   "main": "dist/index.js",
@@ -15,7 +15,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && chmod +x dist/cli/index.js",
     "dev": "tsc --watch",
     "start": "node dist/cli/index.js",
     "test": "NODE_OPTIONS='--experimental-vm-modules' jest --passWithNoTests",
