@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.6.0](https://github.com/bis-code/claw/compare/v1.5.0...v1.6.0) (2026-01-31)
+
+
+### Features
+
+* **auto-update:** implement automatic configuration sync ([#35](https://github.com/bis-code/claw/issues/35)) ([e2670a1](https://github.com/bis-code/claw/commit/e2670a13762af9116fe256040c7aeec0d8c8ef8d))
+* **auto:** add Ralph Wiggum-inspired iteration loop ([#34](https://github.com/bis-code/claw/issues/34)) ([3546fd0](https://github.com/bis-code/claw/commit/3546fd0b8234874078ca4c5fb23ce1ab8cd1f859))
+* claw v2 - Complete TypeScript CLI with Epics 1-6 ([#41](https://github.com/bis-code/claw/issues/41)) ([616cb94](https://github.com/bis-code/claw/commit/616cb9492fbfbb7391d3b7be5ea6c1b129504092))
+* **setup:** add automated setup script and git hook for auto-sync ([#36](https://github.com/bis-code/claw/issues/36)) ([e41ed71](https://github.com/bis-code/claw/commit/e41ed7154f5d931caabda363b120e2bedce025b3))
+
+
+### Bug Fixes
+
+* **ci:** disable all automatic workflows to stop costs ([#32](https://github.com/bis-code/claw/issues/32)) ([3a29725](https://github.com/bis-code/claw/commit/3a29725bddf564460c5e97d35ae0fedd1c4c446d))
+
 ## [1.5.0](https://github.com/bis-code/claw/compare/v1.4.1...v1.5.0) (2026-01-10)
 
 
