@@ -132,15 +132,16 @@ function setupGlobalGitignore(): void {
 // Copy skills to target directory
 function copySkills(targetDir: string): number {
   const skillsSource = join(__dirname, '../../templates/skills');
-  const skillsTarget = join(targetDir, '.claude/skills');
+  const skillsTarget = join(targetDir, '.claude/skills/claw');
 
-  // Create target directory
+  // Create target directory (skills must be in a subdirectory)
   mkdirSync(skillsTarget, { recursive: true });
 
-  // Clean up old v2 skill files that conflict with v3
-  const oldSkills = ['bug.md', 'feature.md', 'improvement.md', 'brainstorm.md'];
+  // Clean up old v2 skill files that might be in wrong locations
+  const oldSkillsDir = join(targetDir, '.claude/skills');
+  const oldSkills = ['bug.md', 'feature.md', 'improvement.md', 'brainstorm.md', 'run.md', 'report-bug.md', 'new-feature.md', 'new-improvement.md', 'SKILL.md'];
   for (const oldSkill of oldSkills) {
-    const oldPath = join(skillsTarget, oldSkill);
+    const oldPath = join(oldSkillsDir, oldSkill);
     if (existsSync(oldPath)) {
       unlinkSync(oldPath);
     }
