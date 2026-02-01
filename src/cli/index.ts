@@ -1765,10 +1765,18 @@ program
   .description('Quick capture a bug to the bugs feature in Obsidian')
   .option('-p, --priority <level>', 'Priority: P0, P1, P2, P3', 'P2')
   .option('-f, --feature <id>', 'Add to specific feature instead of bugs')
+  .option('-i, --image <path>', 'Attach a screenshot or image')
+  .option('--clipboard', 'Attach image from clipboard (macOS)')
   .action(async (description, options) => {
     const { Workspace } = await import('../core/workspace.js');
     const { FeatureManager } = await import('../core/feature.js');
     const { homedir } = await import('os');
+    const { copyFile, mkdir } = await import('fs/promises');
+    const { existsSync } = await import('fs');
+    const { join, basename, extname } = await import('path');
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
 
     const workspace = new Workspace(process.cwd());
     const config = await workspace.load();
@@ -1800,13 +1808,62 @@ program
       }
     }
 
+    // Handle image attachment
+    let imageRef = '';
+    const attachmentsDir = join(vaultPath, projectPath, 'attachments');
+
+    if (options.image || options.clipboard) {
+      // Ensure attachments directory exists
+      if (!existsSync(attachmentsDir)) {
+        await mkdir(attachmentsDir, { recursive: true });
+      }
+
+      const timestamp = Date.now();
+      let imagePath = options.image;
+      let imageName = '';
+
+      if (options.clipboard) {
+        // Save clipboard image using pngpaste (macOS)
+        imageName = `bug-${timestamp}.png`;
+        const destPath = join(attachmentsDir, imageName);
+        try {
+          await execAsync(`pngpaste "${destPath}"`);
+          console.log(chalk.green('  ✓ Captured image from clipboard'));
+        } catch (err) {
+          console.log(chalk.yellow('  ⚠ Could not capture clipboard. Install pngpaste: brew install pngpaste'));
+          // Continue without image
+        }
+      } else if (imagePath) {
+        // Copy provided image
+        if (!existsSync(imagePath)) {
+          console.log(chalk.yellow(`  ⚠ Image not found: ${imagePath}`));
+        } else {
+          const ext = extname(imagePath) || '.png';
+          imageName = `bug-${timestamp}${ext}`;
+          const destPath = join(attachmentsDir, imageName);
+          await copyFile(imagePath, destPath);
+          console.log(chalk.green(`  ✓ Attached image: ${basename(imagePath)}`));
+        }
+      }
+
+      if (imageName) {
+        // Create Obsidian-style image reference
+        imageRef = `![[attachments/${imageName}]]`;
+      }
+    }
+
     // Add bug as a story
     const storyId = String(feature.stories.length + 1);
+    const scope = [description];
+    if (imageRef) {
+      scope.push(`Screenshot: ${imageRef}`);
+    }
+
     const story = {
       id: storyId,
       title: `[${options.priority}] ${description}`,
       status: 'pending' as const,
-      scope: [description],
+      scope,
       repos: [],
     };
 
@@ -1817,6 +1874,9 @@ program
     console.log(chalk.dim(`  Feature: ${featureId}`));
     console.log(chalk.dim(`  Story: #${storyId}`));
     console.log(chalk.dim(`  Priority: ${options.priority}`));
+    if (imageRef) {
+      console.log(chalk.dim(`  Image: ${imageRef}`));
+    }
     console.log('');
     console.log(chalk.dim(`Run \`claw run ${featureId}\` to work on bugs.`));
   });
