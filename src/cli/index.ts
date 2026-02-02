@@ -151,6 +151,7 @@ function copyHooks(targetDir: string): void {
 }
 
 // Update .claude/settings.json with hook configuration
+// New format: {"hooks": {"Stop": [{"matcher": {...}, "hooks": [{"type": "command", "command": "..."}]}]}}
 function updateSettings(targetDir: string): void {
   const settingsPath = join(targetDir, '.claude/settings.json');
   let settings: Record<string, unknown> = {};
@@ -161,22 +162,33 @@ function updateSettings(targetDir: string): void {
     } catch { /* ignore */ }
   }
 
-  // Add hook configuration
+  // Add hook configuration (new format)
   const hooks = (settings.hooks as Record<string, unknown[]>) || {};
   const stopHooks = (hooks.Stop as unknown[]) || [];
 
   // Check if claw hook already exists
   const clawHookExists = stopHooks.some((h: unknown) => {
-    if (typeof h === 'object' && h !== null && 'command' in h) {
-      return (h as { command: string }).command.includes('claw-stop.sh');
+    if (typeof h === 'object' && h !== null && 'hooks' in h) {
+      const innerHooks = (h as { hooks: unknown[] }).hooks;
+      return innerHooks?.some((ih: unknown) => {
+        if (typeof ih === 'object' && ih !== null && 'command' in ih) {
+          return (ih as { command: string }).command.includes('claw-stop.sh');
+        }
+        return false;
+      });
     }
     return false;
   });
 
   if (!clawHookExists) {
     stopHooks.push({
-      matcher: '',
-      command: '.claude/hooks/claw-stop.sh',
+      matcher: {},
+      hooks: [
+        {
+          type: 'command',
+          command: '.claude/hooks/claw-stop.sh',
+        },
+      ],
     });
     hooks.Stop = stopHooks;
     settings.hooks = hooks;
