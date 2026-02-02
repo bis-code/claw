@@ -182,7 +182,7 @@ function updateSettings(targetDir: string): void {
 
   if (!clawHookExists) {
     stopHooks.push({
-      matcher: {},
+      matcher: '',
       hooks: [
         {
           type: 'command',
