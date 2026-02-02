@@ -65,7 +65,7 @@ interface ClawConfig {
 }
 
 // Detect repo type
-function detectRepoType(): 'monorepo' | 'multirepo' | 'none' {
+function detectRepoType(): 'monorepo' | 'multirepo' | 'standalone' {
   const cwd = process.cwd();
 
   // Check if current dir is a git repo
@@ -84,7 +84,8 @@ function detectRepoType(): 'monorepo' | 'multirepo' | 'none' {
     return 'multirepo';
   }
 
-  return 'none';
+  // No git? That's fine - standalone project
+  return 'standalone';
 }
 
 // Get child repos for multi-repo workspace
@@ -386,14 +387,13 @@ program
     // Detect repo type
     const repoType = detectRepoType();
 
-    if (repoType === 'none') {
-      console.log(chalk.red('No git repositories found.'));
-      console.log(chalk.dim('Run this in a git repo or a directory containing git repos.'));
-      process.exit(1);
-    }
-
     const projectName = basename(process.cwd());
-    console.log(`Detected: ${repoType === 'monorepo' ? 'monorepo' : 'multi-repo workspace'} (${projectName})`);
+    const typeLabels = {
+      monorepo: 'git repo',
+      multirepo: 'multi-repo workspace',
+      standalone: 'standalone project (no git)',
+    };
+    console.log(`Detected: ${typeLabels[repoType]} (${projectName})`);
 
     // Check for existing config
     const existingConfig = options.force ? null : loadExistingConfig(process.cwd());
@@ -747,8 +747,8 @@ program
     }
 
     // Initialize based on repo type
-    if (repoType === 'monorepo') {
-      // Single repo init
+    if (repoType === 'monorepo' || repoType === 'standalone') {
+      // Single project init
       const skillCount = copySkills(process.cwd());
       console.log(chalk.green(`✓ Skills installed (${skillCount} files)`));
 
