@@ -129,6 +129,62 @@ function setupGlobalGitignore(): void {
   writeFileSync(globalGitignore, content);
 }
 
+// Copy hooks to target directory
+function copyHooks(targetDir: string): void {
+  const hooksSource = join(__dirname, '../../templates/hooks');
+  const hooksDir = join(targetDir, '.claude/hooks');
+
+  mkdirSync(hooksDir, { recursive: true });
+
+  // Copy stop hook
+  const stopHookSource = join(hooksSource, 'stop.sh');
+  const stopHookTarget = join(hooksDir, 'claw-stop.sh');
+
+  if (existsSync(stopHookSource)) {
+    copyFileSync(stopHookSource, stopHookTarget);
+    // Make executable
+    try {
+      execSync(`chmod +x "${stopHookTarget}"`, { stdio: 'pipe' });
+    } catch { /* ignore on Windows */ }
+  }
+}
+
+// Update .claude/settings.json with hook configuration
+function updateSettings(targetDir: string): void {
+  const settingsPath = join(targetDir, '.claude/settings.json');
+  let settings: Record<string, unknown> = {};
+
+  if (existsSync(settingsPath)) {
+    try {
+      settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
+    } catch { /* ignore */ }
+  }
+
+  // Add hook configuration
+  const hooks = (settings.hooks as Record<string, unknown[]>) || {};
+  const stopHooks = (hooks.Stop as unknown[]) || [];
+
+  // Check if claw hook already exists
+  const clawHookExists = stopHooks.some((h: unknown) => {
+    if (typeof h === 'object' && h !== null && 'command' in h) {
+      return (h as { command: string }).command.includes('claw-stop.sh');
+    }
+    return false;
+  });
+
+  if (!clawHookExists) {
+    stopHooks.push({
+      matcher: '',
+      command: '.claude/hooks/claw-stop.sh',
+    });
+    hooks.Stop = stopHooks;
+    settings.hooks = hooks;
+  }
+
+  mkdirSync(join(targetDir, '.claude'), { recursive: true });
+  writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+}
+
 // Copy skills to target directory
 // Each skill needs its own directory with SKILL.md as entrypoint
 function copySkills(targetDir: string): number {
@@ -136,7 +192,7 @@ function copySkills(targetDir: string): number {
   const skillsDir = join(targetDir, '.claude/skills');
 
   // Skill names
-  const skills = ['claw-run', 'claw-bug', 'claw-feature', 'claw-improve'];
+  const skills = ['claw-run', 'claw-bug', 'claw-feature', 'claw-improve', 'claw-cancel'];
 
   // Clean up old formats
   const oldFiles = [
@@ -230,6 +286,29 @@ Create an improvement (refactor, tech-debt, performance, coverage) in Obsidian.
 3. Create improvement note in Obsidian: \`improvements/<slug>.md\`
 4. If team mode: also create GitHub issue
 `,
+    'claw-cancel': `# /claw-cancel
+
+Cancel the current Claw autonomous loop.
+
+## Usage
+
+\`\`\`
+/claw-cancel
+\`\`\`
+
+## What It Does
+
+1. Removes \`.claw-autonomous\` state file
+2. Allows normal session exit
+3. Preserves \`.claw-session.md\` for later resumption
+
+## Implementation
+
+\`\`\`bash
+rm -f .claw-autonomous
+echo "Claw autonomous loop cancelled."
+\`\`\`
+`,
   };
   return defaults[skill] || `# /${skill}\n\nSkill content.`;
 }
@@ -263,10 +342,12 @@ If no session file exists, no active work.
 
 ## Available Commands
 
-- \`/claw-run\` - Start a work session
+- \`/claw-run\` - Start a work session (interactive)
+- \`/claw-run --auto\` - Start autonomous mode (hands-off)
 - \`/claw-bug\` - Report a bug
 - \`/claw-feature\` - Propose a feature
 - \`/claw-improve\` - Suggest an improvement
+- \`/claw-cancel\` - Stop autonomous loop
 
 ## Configuration
 
@@ -671,6 +752,12 @@ program
       const skillCount = copySkills(process.cwd());
       console.log(chalk.green(`✓ Skills installed (${skillCount} files)`));
 
+      copyHooks(process.cwd());
+      console.log(chalk.green('✓ Autonomous hook installed'));
+
+      updateSettings(process.cwd());
+      console.log(chalk.green('✓ Hook registered in settings'));
+
       createConfig(process.cwd(), config);
       console.log(chalk.green('✓ Config saved'));
 
@@ -708,10 +795,17 @@ Read \`.claw-session.md\` if it exists for current work context.
       writeFileSync(join(process.cwd(), 'CLAUDE.md'), workspaceClaudeMd);
       console.log(chalk.green('✓ Workspace CLAUDE.md created'));
 
+      // Install hooks at workspace root
+      copyHooks(process.cwd());
+      updateSettings(process.cwd());
+      console.log(chalk.green('✓ Autonomous hook installed'));
+
       // Init each child repo
       for (const repo of repos) {
         const repoPath = join(process.cwd(), repo);
         copySkills(repoPath);
+        copyHooks(repoPath);
+        updateSettings(repoPath);
         createConfig(repoPath, config);
         createClaudeMd(repoPath, repo);
         console.log(chalk.green(`✓ Initialized ${repo}/`));
@@ -733,10 +827,12 @@ Read \`.claw-session.md\` if it exists for current work context.
     // Done!
     console.log(chalk.green('\nDone!'));
     console.log(chalk.dim('\nIn Claude Code, try:'));
-    console.log(chalk.cyan('  /claw-run    ') + chalk.dim('- start a work session'));
-    console.log(chalk.cyan('  /claw-bug    ') + chalk.dim('- report a bug'));
-    console.log(chalk.cyan('  /claw-feature') + chalk.dim('- propose a feature'));
-    console.log(chalk.cyan('  /claw-improve') + chalk.dim('- suggest an improvement'));
+    console.log(chalk.cyan('  /claw-run         ') + chalk.dim('- start a work session'));
+    console.log(chalk.cyan('  /claw-run --auto  ') + chalk.dim('- autonomous mode (hands-off)'));
+    console.log(chalk.cyan('  /claw-bug         ') + chalk.dim('- report a bug'));
+    console.log(chalk.cyan('  /claw-feature     ') + chalk.dim('- propose a feature'));
+    console.log(chalk.cyan('  /claw-improve     ') + chalk.dim('- suggest an improvement'));
+    console.log(chalk.cyan('  /claw-cancel      ') + chalk.dim('- stop autonomous loop'));
   });
 
 // Parse and run

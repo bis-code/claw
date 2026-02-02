@@ -5,9 +5,63 @@ Execute work items autonomously with verification and feedback loops.
 ## Usage
 
 ```
-/run              # Batch mode: select multiple items
-/run 123          # Single issue: focus on GitHub issue #123
+/claw-run                    # Interactive: select items, work with check-ins
+/claw-run 123                # Single issue: focus on GitHub issue #123
+/claw-run --auto             # Autonomous: work until complete (no check-ins)
+/claw-run --auto --max 30    # Autonomous with iteration limit
 ```
+
+## Autonomous Mode (`--auto`)
+
+**Hands-off execution** - Claude works through all items without waiting for user input.
+
+### How It Works
+
+1. Creates `.claw-autonomous` state file
+2. Creates `.claw-session.md` with all selected items
+3. Works through items one by one
+4. Stop hook intercepts exit attempts
+5. Loop continues until:
+   - All items complete (all checkboxes checked)
+   - Max iterations reached (default: 50)
+   - Blocker encountered (creates `.claw-blocked`)
+   - User runs `/claw-cancel`
+
+### Starting Autonomous Mode
+
+```
+/claw-run --auto
+```
+
+Claude will:
+1. Read `.claw/config.json`
+2. List available items from sources
+3. Let you select items (or use `--all` for everything)
+4. Start working autonomously
+
+### Safety Features
+
+| Feature | Purpose |
+|---------|---------|
+| `--max <n>` | Limit iterations (default: 50) |
+| `.claw-blocked` | Create this file to pause loop |
+| `/claw-cancel` | Cancel loop immediately |
+| Session file | Progress survives if anything fails |
+
+### Completion Detection
+
+The loop exits when `.claw-session.md` has no incomplete items:
+- `- [x]` = complete
+- `- [ ]` = incomplete
+
+### Blocker Handling
+
+If Claude encounters a blocker it can't resolve:
+
+1. Creates `.claw-blocked` with description
+2. Loop pauses on next iteration
+3. User reviews and resolves
+4. Delete `.claw-blocked` and run `/claw-run --auto` to resume
 
 ## Modes
 
